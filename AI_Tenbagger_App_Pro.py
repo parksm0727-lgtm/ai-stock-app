@@ -10,29 +10,71 @@ import numpy as np
 import os
 import datetime
 
+# --- [1] 페이지 설정 (반드시 가장 먼저 호출) ---
+st.set_page_config(page_title="AI 텐배거 프로", layout="centered", page_icon="📈")
+
+# --- [2] 💡 [핵심 해결] 앱 자체에서 표(Data Editor) 다크 모드 강제 적용 ---
+# 코드가 스스로 .streamlit 폴더와 config.toml 파일을 생성하여 스트림릿 시스템 테마를 강제로 변경합니다.
+def auto_configure_theme():
+    st_dir = ".streamlit"
+    if not os.path.exists(st_dir):
+        os.makedirs(st_dir)
+    
+    config_path = os.path.join(st_dir, "config.toml")
+    theme_config = """
+[theme]
+base="dark"
+backgroundColor="#0B1121"
+secondaryBackgroundColor="#172033"
+textColor="#F8FAFC"
+primaryColor="#38BDF8"
+"""
+    need_update = False
+    if not os.path.exists(config_path):
+        need_update = True
+    else:
+        with open(config_path, "r", encoding="utf-8") as f:
+            if 'base="dark"' not in f.read():
+                need_update = True
+                
+    if need_update:
+        with open(config_path, "w", encoding="utf-8") as f:
+            f.write(theme_config)
+        st.rerun() # 설정 파일 생성 후 즉시 화면 새로고침하여 적용
+
+auto_configure_theme()
+
+# --- [3] 페이지 및 '딥 네이비(Deep Navy)' 프리미엄 UI 강제 적용 ---
 st.markdown("""
     <style>
-    /* 1. 전체 배경 (첨부 이미지 스타일의 깊은 네이비) */
+    /* 전체 배경 */
     .stApp, .main, [data-testid="stSidebar"] {
         background-color: #0B1121 !important;
         color: #F8FAFC !important;
     }
-    h1, h2, h3, h4, h5, h6, p, label, span {
+    h2, h3, h4, h5, h6, p, label, span {
         color: #F8FAFC !important;
     }
     
-    /* 2. 타이틀 그라데이션 (네온 블루) */
+    /* 💡 [핵심 해결] 메인 타이틀 크기 자동 조절 및 두 줄 바꿈 방지 */
     h1 {
         font-weight: 800 !important;
         letter-spacing: -0.5px;
         background: linear-gradient(90deg, #38BDF8 0%, #3B82F6 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        font-size: 1.8rem !important;
+        
+        /* 화면 크기에 맞춰 1.2rem ~ 1.8rem 사이에서 폰트 크기 자동 조절 */
+        font-size: clamp(1.2rem, 6vw, 1.8rem) !important;
+        /* 글자가 길어도 절대 밑으로 떨어지지 않고 한 줄 유지 */
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        
         margin-bottom: 0.5rem !important;
     }
 
-    /* 3. 카드형 컨테이너 */
+    /* 카드형 컨테이너 */
     [data-testid="stMetric"] {
         background-color: #172033 !important;
         border: 1px solid #2D3B55 !important;
@@ -48,7 +90,7 @@ st.markdown("""
         color: #94A3B8 !important;
     }
 
-    /* 4. 아코디언 (Expander) */
+    /* 아코디언 (Expander) */
     [data-testid="stExpander"] {
         background-color: #172033 !important;
         border: 1px solid #2D3B55 !important;
@@ -62,8 +104,11 @@ st.markdown("""
         color: #FFFFFF !important;
         font-weight: 600 !important;
     }
+    [data-testid="stExpander"] details {
+        background-color: #172033 !important;
+    }
 
-    /* 5. 기본 입력창 및 드롭다운 */
+    /* 입력창 및 드롭다운 가독성 개선 */
     .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea {
         background-color: #0B1121 !important;
         color: #FFFFFF !important;
@@ -79,7 +124,7 @@ st.markdown("""
     [data-baseweb="select"] span {
         color: #FFFFFF !important;
     }
-    [data-baseweb="menu"] {
+    [data-baseweb="menu"], [data-baseweb="popover"] {
         background-color: #172033 !important;
         border: 1px solid #2D3B55 !important;
     }
@@ -87,30 +132,11 @@ st.markdown("""
         color: #F8FAFC !important;
         background-color: transparent !important;
     }
-
-    /* 💡 [핵심 해결] 6. 표(Data Editor) 내부 팝업창 및 검색창 완벽 제어 */
-    [data-testid="stDataFrame"] {
-        background-color: #172033 !important;
-    }
-    /* 팝업창(Dialog/Popover) 배경 네이비 지정 */
-    div[role="dialog"], div[data-baseweb="popover"], .gdg-search-container {
-        background-color: #172033 !important;
-        border: 1px solid #2D3B55 !important;
-        border-radius: 8px !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
-    }
-    /* 팝업창 내부 입력칸 글자색 강제 지정 */
-    div[role="dialog"] input, div[data-baseweb="popover"] input, .gdg-search-input {
-        background-color: #0B1121 !important;
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important; /* 사파리/모바일 크롬 대응 */
-        border: 1px solid #38BDF8 !important;
-    }
-    div[role="dialog"] span, div[role="dialog"] p {
-        color: #94A3B8 !important;
+    [data-baseweb="menu"] li:hover {
+        background-color: #2D3B55 !important;
     }
 
-    /* 7. 버튼 스타일 */
+    /* 버튼 스타일 */
     .stButton>button {
         background: linear-gradient(135deg, #0EA5E9 0%, #2563EB 100%) !important;
         color: white !important;
@@ -124,15 +150,17 @@ st.markdown("""
         background: linear-gradient(135deg, #F43F5E 0%, #E11D48 100%) !important;
     }
 
-    /* 8. 탭 (Tabs) */
+    /* 탭 (Tabs) */
     .stTabs [data-baseweb="tab-list"] {
         background-color: #172033 !important;
         border: 1px solid #2D3B55 !important;
         border-radius: 10px !important;
         padding: 5px !important;
+        gap: 5px !important;
     }
     .stTabs [data-baseweb="tab"] {
         color: #94A3B8 !important;
+        border-radius: 6px !important;
     }
     .stTabs [aria-selected="true"] {
         background-color: #2D3B55 !important;
@@ -140,13 +168,14 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-# --- [2] 세션 상태 초기화 ---
+
+# --- [4] 세션 상태 초기화 ---
 if 'watchlist' not in st.session_state:
     st.session_state['watchlist'] = ['ASTS', 'OKLO', 'IONQ', 'RXRX', 'PLTR', 'TSLA']
 if 'current_ticker' not in st.session_state:
     st.session_state['current_ticker'] = 'ASTS'
 
-# --- [3] 사이드바: 설정 및 종목 관리 ---
+# --- [5] 사이드바: 설정 및 종목 관리 ---
 with st.sidebar:
     st.markdown("### ⚙️ 시스템 설정")
     api_key_input = st.text_input("Gemini API Key", type="password")
@@ -173,8 +202,8 @@ with st.sidebar:
             st.session_state['current_ticker'] = st.session_state['watchlist'][0]
         st.rerun()
 
-# --- [4] 메인 화면 타이틀 및 종목 선택 ---
-st.title("📈 AI 텐배거 프로")
+# --- [6] 메인 화면 타이틀 및 종목 선택 ---
+st.title("📈 AI 텐배거 발굴기 Pro")
 st.caption("Professional AI-Driven Stock & Retirement Intelligence")
 st.write("")
 
@@ -196,7 +225,7 @@ data = load_data(ticker)
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 차트", "🧠 리포트", "🎯 목표", "🌟 추천", "📝 일지"])
 
 # ========================================================
-# TAB 1: 📈 차트 & 기술적 분석 (색상 리뉴얼)
+# TAB 1: 📈 차트 & 기술적 분석
 # ========================================================
 with tab1:
     if data.empty:
@@ -221,7 +250,6 @@ with tab1:
         forecast = m.predict(m.make_future_dataframe(periods=years * 365))
         
         fig_chart = go.Figure()
-        # 네이비 배경에 어울리는 핫핑크/네온블루 라인 적용
         fig_chart.add_trace(go.Scatter(x=df_train['ds'], y=df_train['y'], mode='markers', name='실제 주가', marker=dict(color='#64748B', size=3)))
         fig_chart.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], mode='lines', name='AI 예측선', line=dict(color='#F43F5E', width=2)))
         fig_chart.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_upper'], mode='lines', line=dict(width=0), showlegend=False))
@@ -291,7 +319,7 @@ with tab2:
             st.error("데이터를 가져오는 중 오류가 발생했습니다.")
 
 # ========================================================
-# TAB 3: 🎯 목표 & 시뮬레이터 (색상 리뉴얼)
+# TAB 3: 🎯 목표 & 시뮬레이터
 # ========================================================
 with tab3:
     st.subheader("10년 복리 시뮬레이터")
@@ -347,7 +375,7 @@ with tab4:
                     st.error(f"오류: {e}")
 
 # ========================================================
-# TAB 5: 📝 투자 일지 (수정 및 삭제 기능 완벽 구현)
+# TAB 5: 📝 투자 일지 (완벽 제어 지원)
 # ========================================================
 with tab5:
     st.subheader("매매 복기 및 투자 일지")
@@ -369,24 +397,22 @@ with tab5:
                     df_journal = new_data
                 df_journal.to_csv(journal_file, index=False)
                 st.success("새로운 일지가 추가되었습니다!")
-                st.rerun() # 추가 후 화면 새로고침
+                st.rerun()
 
     if os.path.exists(journal_file):
         st.write("")
         st.markdown("### 📋 일지 기록 (수정/삭제 가능)")
-        st.caption("💡 표 안의 글자를 더블클릭하여 바로 수정하거나, 좌측 체크박스를 선택해 삭제(Delete)할 수 있습니다.")
+        st.caption("💡 표 안의 글자를 더블클릭하여 수정하거나, 좌측 끝을 체크한 후 우측 상단의 휴지통을 눌러 삭제하세요.")
         
         df_journal = pd.read_csv(journal_file)
         
-        # st.data_editor를 사용하여 엑셀처럼 실시간 수정/삭제 지원
         edited_df = st.data_editor(
             df_journal, 
-            num_rows="dynamic", # 이 옵션이 행 삭제/추가를 가능하게 합니다
+            num_rows="dynamic",
             use_container_width=True,
             key="journal_editor"
         )
         
-        # 수정된 표를 다시 파일에 저장하는 버튼
         if st.button("💾 변경된 일지 저장하기", use_container_width=True):
             edited_df.to_csv(journal_file, index=False)
             st.success("일지 변경사항이 완벽하게 저장되었습니다!")
