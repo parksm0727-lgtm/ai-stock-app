@@ -10,11 +10,10 @@ import numpy as np
 import os
 import datetime
 
-# --- [1] 페이지 설정 (반드시 가장 먼저 호출) ---
+# --- [1] 페이지 설정 ---
 st.set_page_config(page_title="AI 텐배거 프로", layout="centered", page_icon="📈")
 
-# --- [2] 💡 [핵심 해결] 앱 자체에서 표(Data Editor) 다크 모드 강제 적용 ---
-# 코드가 스스로 .streamlit 폴더와 config.toml 파일을 생성하여 스트림릿 시스템 테마를 강제로 변경합니다.
+# --- [2] 다크 테마 강제 고정 설정 자동화 ---
 def auto_configure_theme():
     st_dir = ".streamlit"
     if not os.path.exists(st_dir):
@@ -29,25 +28,16 @@ secondaryBackgroundColor="#172033"
 textColor="#F8FAFC"
 primaryColor="#38BDF8"
 """
-    need_update = False
     if not os.path.exists(config_path):
-        need_update = True
-    else:
-        with open(config_path, "r", encoding="utf-8") as f:
-            if 'base="dark"' not in f.read():
-                need_update = True
-                
-    if need_update:
         with open(config_path, "w", encoding="utf-8") as f:
             f.write(theme_config)
-        st.rerun() # 설정 파일 생성 후 즉시 화면 새로고침하여 적용
+        st.rerun()
 
 auto_configure_theme()
 
-# --- [3] 페이지 및 '딥 네이비(Deep Navy)' 프리미엄 UI 강제 적용 ---
+# --- [3] 딥 네이비 프리미엄 UI 및 타이틀 한 줄 고정 CSS ---
 st.markdown("""
     <style>
-    /* 전체 배경 */
     .stApp, .main, [data-testid="stSidebar"] {
         background-color: #0B1121 !important;
         color: #F8FAFC !important;
@@ -56,25 +46,20 @@ st.markdown("""
         color: #F8FAFC !important;
     }
     
-    /* 💡 [핵심 해결] 메인 타이틀 크기 자동 조절 및 두 줄 바꿈 방지 */
+    /* 타이틀 크기 자동 조절 및 두 줄 바꿈 방지 */
     h1 {
         font-weight: 800 !important;
         letter-spacing: -0.5px;
         background: linear-gradient(90deg, #38BDF8 0%, #3B82F6 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        
-        /* 화면 크기에 맞춰 1.2rem ~ 1.8rem 사이에서 폰트 크기 자동 조절 */
         font-size: clamp(1.2rem, 6vw, 1.8rem) !important;
-        /* 글자가 길어도 절대 밑으로 떨어지지 않고 한 줄 유지 */
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
-        
         margin-bottom: 0.5rem !important;
     }
 
-    /* 카드형 컨테이너 */
     [data-testid="stMetric"] {
         background-color: #172033 !important;
         border: 1px solid #2D3B55 !important;
@@ -90,7 +75,6 @@ st.markdown("""
         color: #94A3B8 !important;
     }
 
-    /* 아코디언 (Expander) */
     [data-testid="stExpander"] {
         background-color: #172033 !important;
         border: 1px solid #2D3B55 !important;
@@ -108,7 +92,6 @@ st.markdown("""
         background-color: #172033 !important;
     }
 
-    /* 입력창 및 드롭다운 가독성 개선 */
     .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea {
         background-color: #0B1121 !important;
         color: #FFFFFF !important;
@@ -136,7 +119,6 @@ st.markdown("""
         background-color: #2D3B55 !important;
     }
 
-    /* 버튼 스타일 */
     .stButton>button {
         background: linear-gradient(135deg, #0EA5E9 0%, #2563EB 100%) !important;
         color: white !important;
@@ -150,7 +132,6 @@ st.markdown("""
         background: linear-gradient(135deg, #F43F5E 0%, #E11D48 100%) !important;
     }
 
-    /* 탭 (Tabs) */
     .stTabs [data-baseweb="tab-list"] {
         background-color: #172033 !important;
         border: 1px solid #2D3B55 !important;
@@ -375,41 +356,61 @@ with tab4:
                     st.error(f"오류: {e}")
 
 # ========================================================
-# TAB 5: 📝 투자 일지 (완벽 제어 지원)
+# TAB 5: 📝 투자 일지 (달력 선택 및 드롭다운 입력 지원)
 # ========================================================
 with tab5:
     st.subheader("매매 복기 및 투자 일지")
     journal_file = "trading_journal.csv"
     
-    with st.expander("✍️ 새 일지 작성하기"):
+    with st.expander("✍️ 새 일지 작성하기", expanded=True):
         with st.form("journal_form"):
-            c1, c2 = st.columns(2)
-            j_date = c1.date_input("날짜", date.today())
-            j_action = c2.selectbox("구분", ["매수", "매도", "관망"])
+            # 1. 날짜 선택 (달력 컴포넌트)
+            j_date = st.date_input("날짜 선택", date.today())
+            
+            # 2. Ticker 선택 (관심 종목 리스트에서 드롭다운 선택)
+            j_ticker = st.selectbox("종목 선택 (Ticker)", st.session_state['watchlist'])
+            
+            # 3. 구분 선택 (매수/매도/관망)
+            j_action = st.selectbox("매매 구분", ["매수", "매도", "관망"])
+            
+            # 4. 가격 입력
             j_price = st.number_input("가격 ($)", min_value=0.0, format="%.2f")
-            j_reason = st.text_area("결정 논리 및 전략 메모")
+            
+            # 5. Reason만 자유롭게 입력
+            j_reason = st.text_area("결정 논리 및 전략 메모 (Reason)")
             
             if st.form_submit_button("신규 일지 추가", use_container_width=True):
-                new_data = pd.DataFrame([[j_date, ticker, j_action, j_price, j_reason]], columns=["Date", "Ticker", "Action", "Price", "Reason"])
+                new_row = pd.DataFrame([[j_date, j_ticker, j_action, j_price, j_reason]], 
+                                       columns=["Date", "Ticker", "Action", "Price", "Reason"])
                 if os.path.exists(journal_file):
-                    df_journal = pd.concat([pd.read_csv(journal_file), new_data], ignore_index=True)
+                    df_journal = pd.concat([pd.read_csv(journal_file), new_row], ignore_index=True)
                 else:
-                    df_journal = new_data
+                    df_journal = new_row
                 df_journal.to_csv(journal_file, index=False)
                 st.success("새로운 일지가 추가되었습니다!")
                 st.rerun()
 
     if os.path.exists(journal_file):
         st.write("")
-        st.markdown("### 📋 일지 기록 (수정/삭제 가능)")
-        st.caption("💡 표 안의 글자를 더블클릭하여 수정하거나, 좌측 끝을 체크한 후 우측 상단의 휴지통을 눌러 삭제하세요.")
+        st.markdown("### 📋 일지 기록 관리")
+        st.caption("💡 아래 표에서 내용을 직접 수정하거나, 행을 선택해 삭제할 수 있습니다.")
         
         df_journal = pd.read_csv(journal_file)
+        
+        # 데이터 에디터를 통해 날짜, 종목, 구분 등을 표 안에서 손쉽게 수정 및 삭제 가능
+        column_config = {
+            "Date": st.column_config.DateColumn("날짜", format="YYYY-MM-DD"),
+            "Ticker": st.column_config.SelectboxColumn("종목", options=st.session_state['watchlist'], required=True),
+            "Action": st.column_config.SelectboxColumn("구분", options=["매수", "매도", "관망"], required=True),
+            "Price": st.column_config.NumberColumn("가격 ($)", format="$%.2f"),
+            "Reason": st.column_config.TextColumn("전략 메모 (Reason)")
+        }
         
         edited_df = st.data_editor(
             df_journal, 
             num_rows="dynamic",
             use_container_width=True,
+            column_config=column_config,
             key="journal_editor"
         )
         
