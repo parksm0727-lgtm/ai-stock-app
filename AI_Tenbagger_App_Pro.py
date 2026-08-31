@@ -8,19 +8,105 @@ from datetime import date
 import pandas as pd
 import numpy as np
 import os
+import datetime
 
-# --- [1] 모바일 최적화 기본 설정 ---
-st.set_page_config(page_title="AI 텐배거 발굴기", layout="centered", page_icon="📱")
-st.title("📱 AI 주식 분석기 Pro")
+# --- [1] 페이지 및 전문 웹 디자인 CSS 설정 ---
+st.set_page_config(page_title="AI 텐배거 프로", layout="centered", page_icon="📈")
 
+# 전문 핀테크 UI를 위한 커스텀 CSS 주입
+st.markdown("""
+    <style>
+    /* 전체 배경 및 폰트 다듬기 */
+    .stApp {
+        background-color: #0e1117;
+        color: #f0f2f6;
+    }
+    
+    /* 타이틀 스타일 */
+    h1 {
+        font-weight: 800 !important;
+        letter-spacing: -0.5px;
+        background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-size: 1.8rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
+    h2, h3 {
+        font-weight: 700 !important;
+        letter-spacing: -0.3px;
+    }
+
+    /* 카드 스타일 컨테이너 (Metric 및 섹션용) */
+    div[data-testid="stMetric"], .custom-card {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* 버튼 스타일 고급화 */
+    .stButton>button {
+        background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        padding: 0.5rem 1rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 3px 4px rgba(0,0,0,0.2);
+    }
+    .stButton>button:hover {
+        background: linear-gradient(135deg, #2ea043 0%, #238636 100%);
+        box-shadow: 0 4px 8px rgba(46,160,67,0.4);
+        border-color: transparent;
+    }
+
+    /* AI 생성 버튼 강조 (불꽃 느낌) */
+    button[kind="primary"] {
+        background: linear-gradient(135deg, #ff4b4b 0%, #ff6b6b 100%) !important;
+    }
+    button[kind="primary"]:hover {
+        background: linear-gradient(135deg, #ff6b6b 0%, #ff4b4b 100%) !important;
+    }
+
+    /* 탭 디자인 수정 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: #161b22;
+        padding: 6px;
+        border-radius: 10px;
+        border: 1px solid #30363d;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 6px;
+        color: #8b949e;
+        font-weight: 600;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #21262d !important;
+        color: #58a6ff !important;
+    }
+
+    /* 익스팬더(아코디언) 박스 다듬기 */
+    streamlit-expanderHeader {
+        background-color: #161b22 !important;
+        border-radius: 8px !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- [2] 세션 상태 초기화 ---
 if 'watchlist' not in st.session_state:
     st.session_state['watchlist'] = ['ASTS', 'OKLO', 'IONQ', 'RXRX', 'PLTR', 'TSLA']
 if 'current_ticker' not in st.session_state:
     st.session_state['current_ticker'] = 'ASTS'
 
-# --- [2] 사이드바: 설정 및 종목 관리 (최소화) ---
+# --- [3] 사이드바: 설정 및 종목 관리 ---
 with st.sidebar:
-    st.header("⚙️ 환경 설정")
+    st.markdown("### ⚙️ 시스템 설정")
     api_key_input = st.text_input("Gemini API Key", type="password")
     
     if api_key_input:
@@ -29,9 +115,9 @@ with st.sidebar:
         genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
     st.divider()
-    st.header("➕ 관심 종목 관리")
+    st.markdown("### ➕ 관심 종목 관리")
     new_ticker = st.text_input("새 종목 코드 추가", placeholder="예: NVDA")
-    if st.button("추가하기", use_container_width=True):
+    if st.button("종목 추가", use_container_width=True):
         t = new_ticker.upper().strip()
         if t and t not in st.session_state['watchlist']:
             st.session_state['watchlist'].append(t)
@@ -39,15 +125,19 @@ with st.sidebar:
             st.rerun()
             
     del_ticker = st.selectbox("삭제할 종목 선택", st.session_state['watchlist'])
-    if st.button("삭제하기", use_container_width=True):
+    if st.button("종목 삭제", use_container_width=True):
         st.session_state['watchlist'].remove(del_ticker)
         if st.session_state['current_ticker'] == del_ticker and st.session_state['watchlist']:
             st.session_state['current_ticker'] = st.session_state['watchlist'][0]
         st.rerun()
 
-# --- [3] 메인 화면: 모바일 친화적 UI ---
+# --- [4] 메인 화면 타이틀 및 종목 선택 ---
+st.title("📈 AI 텐배거 프로")
+st.caption("Professional AI-Driven Stock & Retirement Intelligence")
+st.write("")
+
 selected_index = st.session_state['watchlist'].index(st.session_state['current_ticker']) if st.session_state['current_ticker'] in st.session_state['watchlist'] else 0
-ticker = st.selectbox("🔍 분석할 종목을 선택하세요", st.session_state['watchlist'], index=selected_index)
+ticker = st.selectbox("🔍 분석 대상 종목", st.session_state['watchlist'], index=selected_index)
 st.session_state['current_ticker'] = ticker
 
 @st.cache_data
@@ -68,34 +158,40 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 차트", "🧠 리포트", "🎯 �
 # ========================================================
 with tab1:
     if data.empty:
-        st.error("데이터가 없습니다.")
+        st.error("데이터를 불러올 수 없습니다.")
     else:
         data['RSI'] = RSIIndicator(close=data['Close'], window=14).rsi()
         roll_max = data['Close'].cummax()
         max_drawdown = (data['Close'] / roll_max - 1.0).min() * 100
         current_price = data['Close'].iloc[-1]
         
+        st.write("")
         c1, c2, c3 = st.columns(3)
         c1.metric("현재가", f"${current_price:.2f}")
-        c2.metric("RSI", f"{data['RSI'].iloc[-1]:.0f}")
-        c3.metric("최대 낙폭", f"{max_drawdown:.1f}%")
+        c2.metric("RSI (14)", f"{data['RSI'].iloc[-1]:.0f}")
+        c3.metric("최대 낙폭 (MDD)", f"{max_drawdown:.1f}%")
+        st.write("")
         
-        years = st.slider("미래 예측 (년)", 1, 5, 2)
+        years = st.slider("미래 예측 기간 (년)", 1, 5, 2)
         df_train = data[['Date', 'Close']].copy().rename(columns={"Date": "ds", "Close": "y"})
         m = Prophet()
         m.fit(df_train)
         forecast = m.predict(m.make_future_dataframe(periods=years * 365))
         
         fig_chart = go.Figure()
-        fig_chart.add_trace(go.Scatter(x=df_train['ds'], y=df_train['y'], mode='markers', name='실제', marker=dict(color='gray', size=3)))
-        fig_chart.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], mode='lines', name='예측', line=dict(color='royalblue')))
+        fig_chart.add_trace(go.Scatter(x=df_train['ds'], y=df_train['y'], mode='markers', name='실제 주가', marker=dict(color='#8b949e', size=3)))
+        fig_chart.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], mode='lines', name='AI 예측선', line=dict(color='#58a6ff', width=2)))
         fig_chart.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_upper'], mode='lines', line=dict(width=0), showlegend=False))
-        fig_chart.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_lower'], mode='lines', line=dict(width=0), fillcolor='rgba(65,105,225,0.2)', fill='tonexty', name='신뢰구간'))
+        fig_chart.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_lower'], mode='lines', line=dict(width=0), fillcolor='rgba(88,166,255,0.15)', fill='tonexty', name='신뢰구간'))
         
-        # 수정된 범례 위치 속성 적용 (y, yanchor)
         fig_chart.update_layout(
-            margin=dict(l=10, r=10, t=30, b=10), 
-            legend=dict(orientation="h", y=-0.2, yanchor="top")
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#f0f2f6'),
+            margin=dict(l=10, r=10, t=30, b=10),
+            legend=dict(orientation="h", y=-0.25, yanchor="top", font=dict(size=11)),
+            xaxis=dict(showgrid=True, gridcolor='#30363d'),
+            yaxis=dict(showgrid=True, gridcolor='#30363d')
         )
         st.plotly_chart(fig_chart, use_container_width=True)
 
@@ -103,64 +199,62 @@ with tab1:
 # TAB 2: 🧠 AI 촉매제 리포트
 # ========================================================
 with tab2:
-    st.subheader("뉴스 기반 AI 분석")
-    if st.button("🔥 AI 리포트 생성 (Gemini 3.6)", use_container_width=True, type="primary"):
+    st.subheader("실시간 뉴스 AI 분석")
+    st.caption("최신 타임스탬프 뉴스를 기반으로 한 인사이트 리포트입니다.")
+    st.write("")
+    
+    if st.button("🔥 AI 심층 리포트 생성 (Gemini 3.6)", use_container_width=True, type="primary"):
         if not api_key_input and "GEMINI_API_KEY" not in os.environ:
-            st.error("사이드바에 API 키를 입력하세요.")
+            st.error("사이드바에 Gemini API 키를 입력해 주세요.")
         else:
-            with st.spinner("최신 뉴스 분석 중..."):
+            with st.spinner("실시간 뉴스 필터링 및 AI 분석 중..."):
                 stock_info = yf.Ticker(ticker)
-                recent_news = stock_info.news[:10] if stock_info.news else [] # 넉넉하게 10개를 가져와서 필터링
-                
-                import datetime
+                recent_news = stock_info.news[:10] if stock_info.news else []
                 current_year = datetime.date.today().year
                 
                 news_items = []
                 for news in recent_news:
                     title = news.get('title', '제목 없음')
                     pub_time = news.get('providerPublishTime', None)
-                    
-                    # 💡 타임스탬프가 존재하는 경우에만 날짜로 변환하여 포함
                     if pub_time:
                         date_str = datetime.datetime.fromtimestamp(pub_time).strftime('%Y-%m-%d')
-                        # 선택 사항: 올해(current_year) 기사만 엄격하게 필터링하고 싶다면 아래 주석을 해제하세요
-                        # if str(current_year) in date_str:
                         news_items.append(f"- [{date_str}] {title}")
                     else:
-                        # 타임스탬프가 없는 경우 굳이 낡은 기사일 확률이 높으므로 제외하거나 표시
-                        continue 
+                        news_items.append(f"- {title}")
                 
                 news_text = "\n".join(news_items) if news_items else "발행일이 확인된 최신 뉴스가 없습니다."
                 
                 prompt = f"""
-                현재 시스템 기준 연도는 {current_year}년입니다. 아래는 종목 '{ticker}'의 발행일이 공식 확인된 실시간 뉴스 목록입니다:
+                현재 시스템 기준 연도는 {current_year}년입니다. 아래는 종목 '{ticker}'의 공식 발행일이 포함된 최신 뉴스 목록입니다:
                 {news_text}
                 
-                위 뉴스 목록의 [날짜]를 바탕으로, 가장 최근에 보도된 실시간 뉴스를 기준으로 {current_year}년 현재 상황에 맞는 단기 급등 촉매제와 장기 리스크를 분석하고 요약해 줘.
+                위 뉴스 목록의 [날짜]를 엄격히 참고하여, 가장 최근에 보도된 실시간 뉴스를 기준으로 {current_year}년 현재 상황에 맞는 단기 급등 촉매제와 장기 리스크를 전문 애널리스트 톤으로 분석하고 요약해 줘.
                 """
                 
                 try:
                     model = genai.GenerativeModel('gemini-3.6-flash')
                     st.markdown(model.generate_content(prompt).text)
                 except Exception as e:
-                    st.error(f"오류: {e}")
+                    st.error(f"오류 발생: {e}")
                     
-    with st.expander("💼 기관 보유량 보기 (Smart Money)"):
+    st.write("")
+    with st.expander("💼 기관 투자자 보유 현황 (Smart Money)"):
         try:
             holders = yf.Ticker(ticker).institutional_holders
             if holders is not None and not holders.empty:
-                st.dataframe(holders[['Holder', 'Shares']])
+                st.dataframe(holders[['Holder', 'Shares']], use_container_width=True)
             else:
-                st.info("데이터가 없습니다.")
+                st.info("기관 보유량 데이터를 찾을 수 없습니다.")
         except:
-            st.error("오류 발생")
+            st.error("데이터를 가져오는 중 오류가 발생했습니다.")
 
 # ========================================================
 # TAB 3: 🎯 목표 & 시뮬레이터
 # ========================================================
 with tab3:
     st.subheader("10년 복리 시뮬레이터")
-    with st.expander("⚙️ 내 은퇴 목표 금액 설정 (터치하여 열기)"):
+    st.write("")
+    with st.expander("⚙️ 은퇴 및 목표 자산 설정 (터치하여 열기)"):
         target_farm = st.number_input("스마트팜 구축", value=300000)
         target_golf = st.number_input("정기 골프 펀드", value=100000)
         target_living = st.number_input("생활 자금", value=600000)
@@ -169,19 +263,23 @@ with tab3:
     total_target = target_farm + target_golf + target_living
     progress = min((current_asset / total_target) * 100, 100.0) if total_target > 0 else 0
     
-    st.write(f"목표액: **${total_target:,.0f}** / 달성률: **{progress:.1f}%**")
+    st.write("")
+    st.markdown(f"**총 목표액:** `${total_target:,.0f}` &nbsp;|&nbsp; **달성률:** `{progress:.1f}%`")
     st.progress(progress / 100)
+    st.write("")
     
     years_sim = np.arange(0, 11)
     target_vals = current_asset * (1000 ** (years_sim/10))
-    fig_sim = go.Figure(go.Scatter(x=years_sim, y=target_vals, mode='lines+markers', line=dict(color='gold')))
-    
-    # 수정된 범례 위치 속성 적용
+    fig_sim = go.Figure(go.Scatter(x=years_sim, y=target_vals, mode='lines+markers', line=dict(color='#ffb300', width=3)))
     fig_sim.update_layout(
-        title="10년 1000배 성장 궤적", 
-        margin=dict(l=10, r=10, t=30, b=10), 
-        template="plotly_dark",
-        legend=dict(orientation="h", y=-0.2, yanchor="top")
+        title="10년 1000배 성장 궤적",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#f0f2f6'),
+        margin=dict(l=10, r=10, t=30, b=10),
+        legend=dict(orientation="h", y=-0.25, yanchor="top"),
+        xaxis=dict(showgrid=True, gridcolor='#30363d', title="경과 년수"),
+        yaxis=dict(showgrid=True, gridcolor='#30363d', title="예상 자산 ($)")
     )
     st.plotly_chart(fig_sim, use_container_width=True)
 
@@ -190,14 +288,16 @@ with tab3:
 # ========================================================
 with tab4:
     st.subheader("혁신 섹터 유망주 발굴")
+    st.write("")
     sector_choice = st.selectbox("분야 선택", ["우주 항공 및 통신", "AI 바이오 헬스케어", "차세대 에너지 (SMR)", "양자 컴퓨팅"])
     
-    if st.button("✨ 추천받기", use_container_width=True):
+    if st.button("✨ 텐배거 후보 추천받기", use_container_width=True):
         if not api_key_input and "GEMINI_API_KEY" not in os.environ:
             st.error("사이드바에 API 키를 입력하세요.")
         else:
-            with st.spinner("발굴 중..."):
-                prompt = f"'{sector_choice}' 분야에서 10배 이상 성장할 잠재력 있는 미국 중소형 혁신 기업 3곳을 추천해 줘."
+            with st.spinner("유망 기업 발굴 분석 중..."):
+                current_year = datetime.date.today().year
+                prompt = f"현재 시점은 {current_year}년입니다. '{sector_choice}' 분야에서 10배 이상(Tenbagger) 성장할 잠재력 있는 미국 중소형 혁신 기업 3곳을 선정하고 핵심 투자 포인트를 요약해 줘."
                 try:
                     model = genai.GenerativeModel('gemini-3.6-flash')
                     st.markdown(model.generate_content(prompt).text)
@@ -208,7 +308,8 @@ with tab4:
 # TAB 5: 📝 투자 일지
 # ========================================================
 with tab5:
-    st.subheader("매매 복기 일지")
+    st.subheader("매매 복기 및 투자 일지")
+    st.write("")
     journal_file = "trading_journal.csv"
     
     with st.expander("✍️ 새 일지 작성하기", expanded=True):
@@ -217,16 +318,18 @@ with tab5:
             j_date = c1.date_input("날짜", date.today())
             j_action = c2.selectbox("구분", ["매수", "매도", "관망"])
             j_price = st.number_input("가격 ($)", min_value=0.0, format="%.2f")
-            j_reason = st.text_area("결정 논리")
+            j_reason = st.text_area("결정 논리 및 전략 메모")
             
-            if st.form_submit_button("저장", use_container_width=True):
+            if st.form_submit_button("일지 저장", use_container_width=True):
                 new_data = pd.DataFrame([[j_date, ticker, j_action, j_price, j_reason]], columns=["Date", "Ticker", "Action", "Price", "Reason"])
                 if os.path.exists(journal_file):
                     df_journal = pd.concat([pd.read_csv(journal_file), new_data], ignore_index=True)
                 else:
                     df_journal = new_data
                 df_journal.to_csv(journal_file, index=False)
-                st.success("저장 완료!")
+                st.success("투자 일지가 안전하게 저장되었습니다!")
 
     if os.path.exists(journal_file):
+        st.write("")
+        st.markdown("### 📋 저장된 일지 목록")
         st.dataframe(pd.read_csv(journal_file), use_container_width=True)
