@@ -110,10 +110,26 @@ with tab2:
         else:
             with st.spinner("분석 중..."):
                 stock_info = yf.Ticker(ticker)
+                stock_info = yf.Ticker(ticker)
                 recent_news = stock_info.news[:5] if stock_info.news else []
-                news_text = "\n".join([f"- {news.get('title', '제목 없음')}" for news in recent_news]) if recent_news else "뉴스 없음"
-                
-                prompt = f"종목 '{ticker}'의 최신 뉴스:\n{news_text}\n이를 바탕으로 단기 급등 촉매제와 장기 리스크를 요약해 줘."
+
+# 뉴스 제목과 함께 발행일(날짜) 정보가 있다면 함께 추출하여 구성
+                news_items = []
+                for news in recent_news:
+                    title = news.get('title', '제목 없음')
+                    # 야후 파이낸스 뉴스 데이터 구조에 따라 날짜 필드가 있을 경우 반영
+                    news_items.append(f"- {title}")
+
+                news_text = "\n".join(news_items) if news_items else "뉴스 없음"
+
+                prompt = f"""
+                종목 '{ticker}'의 가장 최신 뉴스 목록입니다:
+                {news_text}
+
+                반드시 위 뉴스 내용에 포함된 날짜나 시점을 분석하여, **가장 최신 뉴스의 정확한 연도와 날짜를 리포트 상단에 명시**해 주세요. 
+                그 최신 뉴스를 바탕으로 현재 시점에서의 단기 급등 촉매제와 장기 리스크를 분석하고 요약해 줘.
+                """
+
                 try:
                     model = genai.GenerativeModel('gemini-3.6-flash')
                     st.markdown(model.generate_content(prompt).text)
