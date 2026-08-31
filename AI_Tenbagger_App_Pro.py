@@ -10,16 +10,15 @@ import numpy as np
 import os
 import datetime
 
-# --- [1] 페이지 및 전문 웹 디자인 CSS 설정 ---
+# --- [1] 페이지 및 고가독성 다크 디자인 CSS 설정 ---
 st.set_page_config(page_title="AI 텐배거 프로", layout="centered", page_icon="📈")
 
-# 전문 핀테크 UI를 위한 커스텀 CSS 주입
 st.markdown("""
     <style>
-    /* 전체 배경 및 폰트 다듬기 */
+    /* 전체 배경 및 기본 글자 색상 (선명한 흰색) */
     .stApp {
-        background-color: #0e1117;
-        color: #f0f2f6;
+        background-color: #0b0f19;
+        color: #ffffff !important;
     }
     
     /* 타이틀 스타일 */
@@ -30,51 +29,51 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         font-size: 1.8rem !important;
-        margin-bottom: 0.5rem !important;
+        margin-bottom: 0.2rem !important;
     }
     
-    h2, h3 {
-        font-weight: 700 !important;
-        letter-spacing: -0.3px;
+    h2, h3, p, span, label {
+        color: #f0f6fc !important;
     }
 
-    /* 카드 스타일 컨테이너 (Metric 및 섹션용) */
-    div[data-testid="stMetric"], .custom-card {
-        background-color: #161b22;
-        border: 1px solid #30363d;
-        padding: 15px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    /* 카드 스타일 컨테이너 (텍스트가 확실히 보이도록 배경과 테두리 대비 강화) */
+    div[data-testid="stMetric"] {
+        background-color: #161b22 !important;
+        border: 1px. solid #30363d !important;
+        padding: 15px !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
     }
     
+    /* Metric 내부 글자 명확하게 화이트로 고정 */
+    div[data-testid="stMetricLabel"] label {
+        color: #8b949e !important;
+        font-size: 0.9rem !important;
+    }
+    div[data-testid="stMetricValue"] div {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+
     /* 버튼 스타일 고급화 */
     .stButton>button {
         background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
-        color: white;
+        color: white !important;
         border: none;
         border-radius: 8px;
         font-weight: 600;
         padding: 0.5rem 1rem;
-        transition: all 0.3s ease;
         box-shadow: 0 3px 4px rgba(0,0,0,0.2);
     }
-    .stButton>button:hover {
-        background: linear-gradient(135deg, #2ea043 0%, #238636 100%);
-        box-shadow: 0 4px 8px rgba(46,160,67,0.4);
-        border-color: transparent;
-    }
 
-    /* AI 생성 버튼 강조 (불꽃 느낌) */
     button[kind="primary"] {
         background: linear-gradient(135deg, #ff4b4b 0%, #ff6b6b 100%) !important;
-    }
-    button[kind="primary"]:hover {
-        background: linear-gradient(135deg, #ff6b6b 0%, #ff4b4b 100%) !important;
+        color: white !important;
     }
 
-    /* 탭 디자인 수정 */
+    /* 탭 메뉴 글자 선명도 개선 */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
+        gap: 6px;
         background-color: #161b22;
         padding: 6px;
         border-radius: 10px;
@@ -82,18 +81,12 @@ st.markdown("""
     }
     .stTabs [data-baseweb="tab"] {
         border-radius: 6px;
-        color: #8b949e;
+        color: #c9d1d9 !important;
         font-weight: 600;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #21262d !important;
+        background-color: #30363d !important;
         color: #58a6ff !important;
-    }
-
-    /* 익스팬더(아코디언) 박스 다듬기 */
-    streamlit-expanderHeader {
-        background-color: #161b22 !important;
-        border-radius: 8px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -187,11 +180,11 @@ with tab1:
         fig_chart.update_layout(
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='#f0f2f6'),
+            font=dict(color='#ffffff'),
             margin=dict(l=10, r=10, t=30, b=10),
-            legend=dict(orientation="h", y=-0.25, yanchor="top", font=dict(size=11)),
-            xaxis=dict(showgrid=True, gridcolor='#30363d'),
-            yaxis=dict(showgrid=True, gridcolor='#30363d')
+            legend=dict(orientation="h", y=-0.25, yanchor="top", font=dict(size=11, color='#ffffff')),
+            xaxis=dict(showgrid=True, gridcolor='#30363d', tickfont=dict(color='#ffffff')),
+            yaxis=dict(showgrid=True, gridcolor='#30363d', tickfont=dict(color='#ffffff'))
         )
         st.plotly_chart(fig_chart, use_container_width=True)
 
@@ -275,11 +268,11 @@ with tab3:
         title="10년 1000배 성장 궤적",
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#f0f2f6'),
+        font=dict(color='#ffffff'),
         margin=dict(l=10, r=10, t=30, b=10),
-        legend=dict(orientation="h", y=-0.25, yanchor="top"),
-        xaxis=dict(showgrid=True, gridcolor='#30363d', title="경과 년수"),
-        yaxis=dict(showgrid=True, gridcolor='#30363d', title="예상 자산 ($)")
+        legend=dict(orientation="h", y=-0.25, yanchor="top", font=dict(color='#ffffff')),
+        xaxis=dict(showgrid=True, gridcolor='#30363d', title="경과 년수", tickfont=dict(color='#ffffff')),
+        yaxis=dict(showgrid=True, gridcolor='#30363d', title="예상 자산 ($)", tickfont=dict(color='#ffffff'))
     )
     st.plotly_chart(fig_sim, use_container_width=True)
 
