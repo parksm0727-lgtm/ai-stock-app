@@ -571,20 +571,21 @@ with tab5:
 
         st.write("")
         st.markdown("### 🗑️ 일지 삭제")
-        label_map = {
-            row["ID"]: f"{row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else '날짜없음'} · "
-                        f"{row['Ticker']} · {row['Action']} · ${row['Price']:,.2f}"
-            for _, row in view_df.iterrows()
-        }
-        to_delete_ids = st.multiselect(
-            "삭제할 일지를 선택하세요 (여러 개 선택 가능)",
-            options=list(label_map.keys()),
-            format_func=lambda i: label_map.get(i, i),
-        )
-        if st.button("선택한 일지 삭제", type="primary", disabled=not to_delete_ids, use_container_width=True):
-            remaining_df = df_journal[~df_journal["ID"].isin(to_delete_ids)]
-            save_journal(remaining_df)
-            st.success(f"{len(to_delete_ids)}개의 일지를 삭제했습니다.")
-            st.rerun()
+        st.caption("항목 옆 '삭제' 버튼을 누르면 확인 없이 바로 지워집니다.")
+        view_df_sorted = view_df.sort_values("Date", ascending=False, na_position="last")
+        for _, row in view_df_sorted.iterrows():
+            row_id = row["ID"]
+            date_str = row["Date"].strftime("%Y-%m-%d") if pd.notna(row["Date"]) else "날짜없음"
+            reason_preview = (str(row["Reason"])[:40] + "…") if isinstance(row["Reason"], str) and len(str(row["Reason"])) > 40 else row["Reason"]
+            rcol1, rcol2 = st.columns([5, 1])
+            rcol1.markdown(
+                f"**{date_str}** · {row['Ticker']} · {row['Action']} · ${row['Price']:,.2f}"
+                + (f" — {reason_preview}" if isinstance(reason_preview, str) and reason_preview else "")
+            )
+            if rcol2.button("삭제", key=f"del_{row_id}", use_container_width=True):
+                remaining_df = df_journal[df_journal["ID"] != row_id]
+                save_journal(remaining_df)
+                st.success("삭제했습니다.")
+                st.rerun()
     else:
         st.info("아직 작성된 일지가 없습니다. 위에서 첫 기록을 추가해 보세요.")
