@@ -15,13 +15,13 @@ st.set_page_config(page_title="AI 텐배거 프로", layout="centered", page_ico
 
 st.markdown("""
     <style>
-    /* 전체 배경 및 기본 글자 색상 (선명한 흰색) */
+    /* 전체 배경 및 기본 글자 색상 */
     .stApp {
         background-color: #0b0f19;
         color: #ffffff !important;
     }
     
-    /* 타이틀 스타일 */
+    /* 타이틀 및 주요 텍스트 색상 고정 */
     h1 {
         font-weight: 800 !important;
         letter-spacing: -0.5px;
@@ -36,16 +36,15 @@ st.markdown("""
         color: #f0f6fc !important;
     }
 
-    /* 카드 스타일 컨테이너 (텍스트가 확실히 보이도록 배경과 테두리 대비 강화) */
+    /* 카드 스타일 컨테이너 */
     div[data-testid="stMetric"] {
         background-color: #161b22 !important;
-        border: 1px. solid #30363d !important;
+        border: 1px solid #30363d !important;
         padding: 15px !important;
         border-radius: 12px !important;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
     }
     
-    /* Metric 내부 글자 명확하게 화이트로 고정 */
     div[data-testid="stMetricLabel"] label {
         color: #8b949e !important;
         font-size: 0.9rem !important;
@@ -53,6 +52,27 @@ st.markdown("""
     div[data-testid="stMetricValue"] div {
         color: #ffffff !important;
         font-weight: 700 !important;
+    }
+
+    /* 💡 [핵심 수정] 입력창(텍스트, 넘버, 날짜, 셀렉트박스 등) 가독성 완벽 개선 */
+    input, textarea, select {
+        background-color: #161b22 !important;
+        color: #ffffff !important;
+        border: 1px solid #30363d !important;
+        border-radius: 8px !important;
+    }
+    
+    /* Streamlit 입력 위젯 내부 텍스트 및 레이블 색상 강제 고정 */
+    .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea {
+        color: #ffffff !important;
+        background-color: #161b22 !important;
+    }
+    
+    /* 셀렉트박스 드롭다운 내부 텍스트 */
+    div[data-baseweb="select"] > div {
+        background-color: #161b22 !important;
+        color: #ffffff !important;
+        border-color: #30363d !important;
     }
 
     /* 버튼 스타일 고급화 */
