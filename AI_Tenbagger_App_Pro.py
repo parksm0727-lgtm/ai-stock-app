@@ -10,9 +10,6 @@ import numpy as np
 import os
 import datetime
 
-# --- [1] 페이지 및 '딥 네이비(Deep Navy)' 프리미엄 UI 강제 적용 ---
-st.set_page_config(page_title="AI 텐배거 프로", layout="centered", page_icon="📈")
-
 st.markdown("""
     <style>
     /* 1. 전체 배경 (첨부 이미지 스타일의 깊은 네이비) */
@@ -35,7 +32,7 @@ st.markdown("""
         margin-bottom: 0.5rem !important;
     }
 
-    /* 3. 카드형 컨테이너 (네이비 톤의 살짝 밝은 배경) */
+    /* 3. 카드형 컨테이너 */
     [data-testid="stMetric"] {
         background-color: #172033 !important;
         border: 1px solid #2D3B55 !important;
@@ -51,7 +48,7 @@ st.markdown("""
         color: #94A3B8 !important;
     }
 
-    /* 4. 아코디언 (Expander) 프리미엄 네이비 톤 맞춤 */
+    /* 4. 아코디언 (Expander) */
     [data-testid="stExpander"] {
         background-color: #172033 !important;
         border: 1px solid #2D3B55 !important;
@@ -65,11 +62,8 @@ st.markdown("""
         color: #FFFFFF !important;
         font-weight: 600 !important;
     }
-    [data-testid="stExpander"] details {
-        background-color: #172033 !important;
-    }
 
-    /* 5. 입력창 및 드롭다운 가독성 및 디자인 */
+    /* 5. 기본 입력창 및 드롭다운 */
     .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea {
         background-color: #0B1121 !important;
         color: #FFFFFF !important;
@@ -85,7 +79,7 @@ st.markdown("""
     [data-baseweb="select"] span {
         color: #FFFFFF !important;
     }
-    [data-baseweb="menu"], [data-baseweb="popover"] {
+    [data-baseweb="menu"] {
         background-color: #172033 !important;
         border: 1px solid #2D3B55 !important;
     }
@@ -93,16 +87,30 @@ st.markdown("""
         color: #F8FAFC !important;
         background-color: transparent !important;
     }
-    [data-baseweb="menu"] li:hover {
-        background-color: #2D3B55 !important;
-    }
 
-    /* 6. 데이터프레임 (일지) 디자인 */
+    /* 💡 [핵심 해결] 6. 표(Data Editor) 내부 팝업창 및 검색창 완벽 제어 */
     [data-testid="stDataFrame"] {
         background-color: #172033 !important;
     }
+    /* 팝업창(Dialog/Popover) 배경 네이비 지정 */
+    div[role="dialog"], div[data-baseweb="popover"], .gdg-search-container {
+        background-color: #172033 !important;
+        border: 1px solid #2D3B55 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+    }
+    /* 팝업창 내부 입력칸 글자색 강제 지정 */
+    div[role="dialog"] input, div[data-baseweb="popover"] input, .gdg-search-input {
+        background-color: #0B1121 !important;
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important; /* 사파리/모바일 크롬 대응 */
+        border: 1px solid #38BDF8 !important;
+    }
+    div[role="dialog"] span, div[role="dialog"] p {
+        color: #94A3B8 !important;
+    }
 
-    /* 7. 버튼 스타일 (앱 포트폴리오 느낌의 쨍한 블루/그린) */
+    /* 7. 버튼 스타일 */
     .stButton>button {
         background: linear-gradient(135deg, #0EA5E9 0%, #2563EB 100%) !important;
         color: white !important;
@@ -122,11 +130,9 @@ st.markdown("""
         border: 1px solid #2D3B55 !important;
         border-radius: 10px !important;
         padding: 5px !important;
-        gap: 5px !important;
     }
     .stTabs [data-baseweb="tab"] {
         color: #94A3B8 !important;
-        border-radius: 6px !important;
     }
     .stTabs [aria-selected="true"] {
         background-color: #2D3B55 !important;
@@ -134,7 +140,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
 # --- [2] 세션 상태 초기화 ---
 if 'watchlist' not in st.session_state:
     st.session_state['watchlist'] = ['ASTS', 'OKLO', 'IONQ', 'RXRX', 'PLTR', 'TSLA']
