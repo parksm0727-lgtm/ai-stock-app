@@ -498,9 +498,14 @@ with tab5:
             df = pd.read_csv(JOURNAL_FILE)
             if "ID" not in df.columns:
                 df.insert(0, "ID", [uuid.uuid4().hex[:8] for _ in range(len(df))])
-            df["Date"] = df["Date"].astype(str)
+            df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
             return df
         return pd.DataFrame(columns=JOURNAL_COLUMNS)
+
+    def save_journal(df: pd.DataFrame):
+        df = df.copy()
+        df["Date"] = pd.to_datetime(df["Date"]).dt.date.astype(str)
+        df.to_csv(JOURNAL_FILE, index=False)
 
     with st.expander("✍️ 새 일지 작성하기"):
         with st.form("journal_form"):
@@ -511,10 +516,9 @@ with tab5:
             j_reason = st.text_area("결정 논리 및 전략 메모")
 
             if st.form_submit_button("신규 일지 추가", use_container_width=True):
-                new_row = pd.DataFrame([[uuid.uuid4().hex[:8], str(j_date), ticker, j_action, j_price, j_reason]],
+                new_row = pd.DataFrame([[uuid.uuid4().hex[:8], pd.to_datetime(j_date), ticker, j_action, j_price, j_reason]],
                                         columns=JOURNAL_COLUMNS)
-                df_journal = pd.concat([load_journal(), new_row], ignore_index=True)
-                df_journal.to_csv(JOURNAL_FILE, index=False)
+                save_journal(pd.concat([load_journal(), new_row], ignore_index=True))
                 st.success("새로운 일지가 추가되었습니다!")
                 st.rerun()
 
@@ -531,29 +535,56 @@ with tab5:
         m2.metric("매도 기록", len(sells))
         m3.metric("평균 매수가", f"${buys['Price'].mean():,.2f}" if len(buys) else "—")
 
+        # 티커 선택지에는 관심 종목 + 일지에 이미 남아있는 과거 종목을 모두 포함
+        ticker_options = sorted(set(st.session_state["watchlist"]) | set(df_journal["Ticker"].dropna().unique().tolist()))
+
         st.write("")
-        st.markdown("### 📋 일지 기록 (수정/삭제 가능)")
-        st.caption("💡 표 안의 내용을 직접 수정하거나, 좌측 끝 행을 선택해 삭제할 수 있습니다.")
+        st.markdown("### 📋 일지 기록 (내용 수정)")
+        st.caption("💡 날짜는 달력에서, 티커·구분은 목록에서 선택해 수정할 수 있어요. 메모(Reason)만 자유 입력입니다.")
 
         edited_df = st.data_editor(
-            view_df, num_rows="dynamic", use_container_width=True,
-            key="journal_editor", column_config={"ID": st.column_config.TextColumn(disabled=True)}
+            view_df,
+            num_rows="fixed",  # 행 추가/삭제는 아래 전용 UI로 처리 (표 안 삭제는 잘 안 먹는 경우가 많아 분리함)
+            use_container_width=True,
+            hide_index=True,
+            key="journal_editor",
+            column_config={
+                "ID": st.column_config.TextColumn("ID", disabled=True),
+                "Date": st.column_config.DateColumn("날짜", format="YYYY-MM-DD"),
+                "Ticker": st.column_config.SelectboxColumn("티커", options=ticker_options),
+                "Action": st.column_config.SelectboxColumn("구분", options=["매수", "매도", "관망"]),
+                "Price": st.column_config.NumberColumn("가격 ($)", format="$%.2f", min_value=0.0),
+                "Reason": st.column_config.TextColumn("메모"),
+            },
         )
 
         if st.button("💾 변경된 일지 저장하기", use_container_width=True):
-            edited_df = edited_df.copy()
-            missing_id = edited_df["ID"].isna() | (edited_df["ID"] == "")
-            edited_df.loc[missing_id, "ID"] = [uuid.uuid4().hex[:8] for _ in range(missing_id.sum())]
-
             if current_only:
                 # 필터링된 뷰만 편집했을 경우, 다른 종목 기록은 그대로 두고 병합
                 other_rows = df_journal[df_journal["Ticker"] != ticker]
                 final_df = pd.concat([other_rows, edited_df], ignore_index=True)
             else:
                 final_df = edited_df
-
-            final_df.to_csv(JOURNAL_FILE, index=False)
+            save_journal(final_df)
             st.success("일지 변경사항이 저장되었습니다!")
+            st.rerun()
+
+        st.write("")
+        st.markdown("### 🗑️ 일지 삭제")
+        label_map = {
+            row["ID"]: f"{row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else '날짜없음'} · "
+                        f"{row['Ticker']} · {row['Action']} · ${row['Price']:,.2f}"
+            for _, row in view_df.iterrows()
+        }
+        to_delete_ids = st.multiselect(
+            "삭제할 일지를 선택하세요 (여러 개 선택 가능)",
+            options=list(label_map.keys()),
+            format_func=lambda i: label_map.get(i, i),
+        )
+        if st.button("선택한 일지 삭제", type="primary", disabled=not to_delete_ids, use_container_width=True):
+            remaining_df = df_journal[~df_journal["ID"].isin(to_delete_ids)]
+            save_journal(remaining_df)
+            st.success(f"{len(to_delete_ids)}개의 일지를 삭제했습니다.")
             st.rerun()
     else:
         st.info("아직 작성된 일지가 없습니다. 위에서 첫 기록을 추가해 보세요.")
