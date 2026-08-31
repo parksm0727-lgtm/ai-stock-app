@@ -54,25 +54,22 @@ st.markdown("""
         font-weight: 700 !important;
     }
 
-    /* 💡 [핵심 수정] 입력창(텍스트, 넘버, 날짜, 셀렉트박스 등) 가독성 완벽 개선 */
-    input, textarea, select {
-        background-color: #161b22 !important;
-        color: #ffffff !important;
-        border: 1px solid #30363d !important;
-        border-radius: 8px !important;
-    }
-    
-    /* Streamlit 입력 위젯 내부 텍스트 및 레이블 색상 강제 고정 */
-    .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea {
-        color: #ffffff !important;
-        background-color: #161b22 !important;
-    }
-    
-    /* 셀렉트박스 드롭다운 내부 텍스트 */
-    div[data-baseweb="select"] > div {
+    /* 💡 [핵심 수정] 모든 입력창 및 날짜/숫자/텍스트 박스 가독성 완벽 개선 */
+    div[data-baseweb="input"], div[data-baseweb="base-input"], input, textarea, select {
         background-color: #161b22 !important;
         color: #ffffff !important;
         border-color: #30363d !important;
+    }
+    
+    input, textarea {
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
+
+    /* 셀렉트박스 및 날짜 입력 컴포넌트 내부 텍스트 */
+    div[data-baseweb="select"] > div, div[data-baseweb="calendar"] {
+        background-color: #161b22 !important;
+        color: #ffffff !important;
     }
 
     /* 버튼 스타일 고급화 */
