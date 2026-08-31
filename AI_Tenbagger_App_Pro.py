@@ -108,28 +108,33 @@ with tab2:
         if not api_key_input and "GEMINI_API_KEY" not in os.environ:
             st.error("사이드바에 API 키를 입력하세요.")
         else:
-            with st.spinner("분석 중..."):
-                stock_info = yf.Ticker(ticker)
+            with st.spinner("최신 뉴스 분석 중..."):
                 stock_info = yf.Ticker(ticker)
                 recent_news = stock_info.news[:5] if stock_info.news else []
-
-                # 뉴스 제목과 함께 발행일(날짜) 정보가 있다면 함께 추출하여 구성
+                
+                import datetime
+                current_year = datetime.date.today().year  # 시스템의 현재 연도를 동적으로 가져옴
+                
+                # 뉴스 제목과 날짜(타임스탬프)를 함께 추출
                 news_items = []
                 for news in recent_news:
                     title = news.get('title', '제목 없음')
-                    # 야후 파이낸스 뉴스 데이터 구조에 따라 날짜 필드가 있을 경우 반영
-                    news_items.append(f"- {title}")
-
+                    pub_time = news.get('providerPublishTime', None)
+                    if pub_time:
+                        date_str = datetime.datetime.fromtimestamp(pub_time).strftime('%Y-%m-%d')
+                        news_items.append(f"- [{date_str}] {title}")
+                    else:
+                        news_items.append(f"- {title}")
+                
                 news_text = "\n".join(news_items) if news_items else "뉴스 없음"
-
+                
                 prompt = f"""
-                종목 '{ticker}'의 가장 최신 뉴스 목록입니다:
+                현재 시스템 기준 연도는 {current_year}년입니다. 아래는 종목 '{ticker}'의 수집된 최신 뉴스 목록(발행일 포함)입니다:
                 {news_text}
-
-                반드시 위 뉴스 내용에 포함된 날짜나 시점을 분석하여, **가장 최신 뉴스의 정확한 연도와 날짜를 리포트 상단에 명시**해 주세요. 
-                그 최신 뉴스를 바탕으로 현재 시점에서의 단기 급등 촉매제와 장기 리스크를 분석하고 요약해 줘.
+                
+                위 뉴스 목록의 [날짜]를 최우선으로 참고하여, 가장 최근에 보도된 실시간 뉴스를 기준으로 {current_year}년 현재 상황에 맞는 단기 급등 촉매제와 장기 리스크를 분석하고 요약해 줘.
                 """
-
+                
                 try:
                     model = genai.GenerativeModel('gemini-3.6-flash')
                     st.markdown(model.generate_content(prompt).text)
