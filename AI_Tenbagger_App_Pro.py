@@ -113,7 +113,7 @@ with tab2:
                 stock_info = yf.Ticker(ticker)
                 recent_news = stock_info.news[:5] if stock_info.news else []
 
-# 뉴스 제목과 함께 발행일(날짜) 정보가 있다면 함께 추출하여 구성
+                # 뉴스 제목과 함께 발행일(날짜) 정보가 있다면 함께 추출하여 구성
                 news_items = []
                 for news in recent_news:
                     title = news.get('title', '제목 없음')
