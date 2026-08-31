@@ -528,6 +528,16 @@ with tab5:
         current_only = st.checkbox(f"'{ticker}' 종목만 보기", value=False)
         view_df = df_journal[df_journal["Ticker"] == ticker] if current_only else df_journal
 
+        with st.expander("⚠️ 일지 전체 삭제"):
+            scope_desc = f"'{ticker}' 종목 기록만" if current_only else "전체 종목 기록 전부"
+            st.caption(f"지금 체크박스 기준으로 **{scope_desc}** ({len(view_df)}건)이 삭제됩니다. 되돌릴 수 없어요.")
+            confirm_clear = st.checkbox("네, 정말 전체 삭제하겠습니다", key="confirm_clear_journal")
+            if st.button("전체 삭제 실행", type="primary", disabled=not confirm_clear, use_container_width=True):
+                remaining_df = df_journal[df_journal["Ticker"] != ticker] if current_only else pd.DataFrame(columns=JOURNAL_COLUMNS)
+                save_journal(remaining_df)
+                st.success("전체 삭제가 완료되었습니다!")
+                st.rerun()
+
         buys = view_df[view_df["Action"] == "매수"]
         sells = view_df[view_df["Action"] == "매도"]
         m1, m2, m3 = st.columns(3)
