@@ -10,123 +10,127 @@ import numpy as np
 import os
 import datetime
 
-# --- [1] 페이지 및 완벽한 다크 모드 CSS 강제 적용 ---
+# --- [1] 페이지 및 '딥 네이비(Deep Navy)' 프리미엄 UI 강제 적용 ---
 st.set_page_config(page_title="AI 텐배거 프로", layout="centered", page_icon="📈")
 
 st.markdown("""
     <style>
-    /* 1. 전체 배경 및 기본 텍스트 (다크 모드 강제 적용) */
+    /* 1. 전체 배경 (첨부 이미지 스타일의 깊은 네이비) */
     .stApp, .main, [data-testid="stSidebar"] {
-        background-color: #0d1117 !important;
-        color: #c9d1d9 !important;
+        background-color: #0B1121 !important;
+        color: #F8FAFC !important;
     }
     h1, h2, h3, h4, h5, h6, p, label, span {
-        color: #c9d1d9 !important;
+        color: #F8FAFC !important;
     }
     
-    /* 2. 타이틀 그라데이션 */
+    /* 2. 타이틀 그라데이션 (네온 블루) */
     h1 {
         font-weight: 800 !important;
         letter-spacing: -0.5px;
-        background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+        background: linear-gradient(90deg, #38BDF8 0%, #3B82F6 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         font-size: 1.8rem !important;
         margin-bottom: 0.5rem !important;
     }
 
-    /* 3. 카드형 컨테이너 (지표 등) */
+    /* 3. 카드형 컨테이너 (네이비 톤의 살짝 밝은 배경) */
     [data-testid="stMetric"] {
-        background-color: #161b22 !important;
-        border: 1px solid #30363d !important;
+        background-color: #172033 !important;
+        border: 1px solid #2D3B55 !important;
         border-radius: 12px !important;
         padding: 15px !important;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4) !important;
     }
     [data-testid="stMetricValue"] div {
-        color: #ffffff !important;
+        color: #FFFFFF !important;
         font-weight: 700 !important;
     }
     [data-testid="stMetricLabel"] label {
-        color: #8b949e !important;
+        color: #94A3B8 !important;
     }
 
-    /* 4. 💡 [핵심 해결] 아코디언 (Expander) 하얀 배경 겹침 현상 완벽 제거 */
+    /* 4. 아코디언 (Expander) 프리미엄 네이비 톤 맞춤 */
     [data-testid="stExpander"] {
-        background-color: #161b22 !important;
-        border: 1px solid #30363d !important;
+        background-color: #172033 !important;
+        border: 1px solid #2D3B55 !important;
         border-radius: 12px !important;
     }
     [data-testid="stExpander"] summary {
-        background-color: #161b22 !important;
+        background-color: #172033 !important;
         border-radius: 12px !important;
     }
     [data-testid="stExpander"] summary p, [data-testid="stExpander"] summary span {
-        color: #ffffff !important;
+        color: #FFFFFF !important;
         font-weight: 600 !important;
     }
     [data-testid="stExpander"] details {
-        background-color: #161b22 !important;
+        background-color: #172033 !important;
     }
 
-    /* 5. 💡 [핵심 해결] 입력창 (텍스트, 날짜, 셀렉트박스 등) 가독성 극대화 */
+    /* 5. 입력창 및 드롭다운 가독성 및 디자인 */
     .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea {
-        background-color: #0d1117 !important;
-        color: #ffffff !important;
-        border: 1px solid #30363d !important;
+        background-color: #0B1121 !important;
+        color: #FFFFFF !important;
+        border: 1px solid #2D3B55 !important;
         border-radius: 8px !important;
     }
-    
-    /* Selectbox (드롭다운) 전용 스타일 */
     [data-baseweb="select"] > div {
-        background-color: #0d1117 !important;
-        color: #ffffff !important;
-        border: 1px solid #30363d !important;
+        background-color: #0B1121 !important;
+        color: #FFFFFF !important;
+        border: 1px solid #2D3B55 !important;
         border-radius: 8px !important;
     }
     [data-baseweb="select"] span {
-        color: #ffffff !important;
+        color: #FFFFFF !important;
     }
     [data-baseweb="menu"], [data-baseweb="popover"] {
-        background-color: #161b22 !important;
-        border: 1px solid #30363d !important;
+        background-color: #172033 !important;
+        border: 1px solid #2D3B55 !important;
     }
     [data-baseweb="menu"] li {
-        color: #c9d1d9 !important;
+        color: #F8FAFC !important;
         background-color: transparent !important;
     }
     [data-baseweb="menu"] li:hover {
-        background-color: #30363d !important;
+        background-color: #2D3B55 !important;
     }
 
-    /* 6. 버튼 스타일 */
+    /* 6. 데이터프레임 (일지) 디자인 */
+    [data-testid="stDataFrame"] {
+        background-color: #172033 !important;
+    }
+
+    /* 7. 버튼 스타일 (앱 포트폴리오 느낌의 쨍한 블루/그린) */
     .stButton>button {
-        background: linear-gradient(135deg, #238636 0%, #2ea043 100%) !important;
+        background: linear-gradient(135deg, #0EA5E9 0%, #2563EB 100%) !important;
         color: white !important;
         border: none !important;
         border-radius: 8px !important;
         font-weight: 600 !important;
         padding: 0.5rem 1rem !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
     }
     button[kind="primary"] {
-        background: linear-gradient(135deg, #ff4b4b 0%, #ff6b6b 100%) !important;
+        background: linear-gradient(135deg, #F43F5E 0%, #E11D48 100%) !important;
     }
 
-    /* 7. 탭 (Tabs) 디자인 */
+    /* 8. 탭 (Tabs) */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: #161b22 !important;
-        border: 1px solid #30363d !important;
+        background-color: #172033 !important;
+        border: 1px solid #2D3B55 !important;
         border-radius: 10px !important;
         padding: 5px !important;
         gap: 5px !important;
     }
     .stTabs [data-baseweb="tab"] {
-        color: #8b949e !important;
+        color: #94A3B8 !important;
         border-radius: 6px !important;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #30363d !important;
-        color: #58a6ff !important;
+        background-color: #2D3B55 !important;
+        color: #38BDF8 !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -187,7 +191,7 @@ data = load_data(ticker)
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 차트", "🧠 리포트", "🎯 목표", "🌟 추천", "📝 일지"])
 
 # ========================================================
-# TAB 1: 📈 차트 & 기술적 분석
+# TAB 1: 📈 차트 & 기술적 분석 (색상 리뉴얼)
 # ========================================================
 with tab1:
     if data.empty:
@@ -212,19 +216,20 @@ with tab1:
         forecast = m.predict(m.make_future_dataframe(periods=years * 365))
         
         fig_chart = go.Figure()
-        fig_chart.add_trace(go.Scatter(x=df_train['ds'], y=df_train['y'], mode='markers', name='실제 주가', marker=dict(color='#8b949e', size=3)))
-        fig_chart.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], mode='lines', name='AI 예측선', line=dict(color='#58a6ff', width=2)))
+        # 네이비 배경에 어울리는 핫핑크/네온블루 라인 적용
+        fig_chart.add_trace(go.Scatter(x=df_train['ds'], y=df_train['y'], mode='markers', name='실제 주가', marker=dict(color='#64748B', size=3)))
+        fig_chart.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], mode='lines', name='AI 예측선', line=dict(color='#F43F5E', width=2)))
         fig_chart.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_upper'], mode='lines', line=dict(width=0), showlegend=False))
-        fig_chart.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_lower'], mode='lines', line=dict(width=0), fillcolor='rgba(88,166,255,0.15)', fill='tonexty', name='신뢰구간'))
+        fig_chart.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_lower'], mode='lines', line=dict(width=0), fillcolor='rgba(244,63,94,0.15)', fill='tonexty', name='신뢰구간'))
         
         fig_chart.update_layout(
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='#ffffff'),
+            font=dict(color='#F8FAFC'),
             margin=dict(l=10, r=10, t=30, b=10),
-            legend=dict(orientation="h", y=-0.25, yanchor="top", font=dict(size=11, color='#ffffff')),
-            xaxis=dict(showgrid=True, gridcolor='#30363d', tickfont=dict(color='#ffffff')),
-            yaxis=dict(showgrid=True, gridcolor='#30363d', tickfont=dict(color='#ffffff'))
+            legend=dict(orientation="h", y=-0.25, yanchor="top", font=dict(size=11, color='#F8FAFC')),
+            xaxis=dict(showgrid=True, gridcolor='#1E293B', tickfont=dict(color='#F8FAFC')),
+            yaxis=dict(showgrid=True, gridcolor='#1E293B', tickfont=dict(color='#F8FAFC'))
         )
         st.plotly_chart(fig_chart, use_container_width=True)
 
@@ -233,10 +238,9 @@ with tab1:
 # ========================================================
 with tab2:
     st.subheader("실시간 뉴스 AI 분석")
-    st.caption("최신 타임스탬프 뉴스를 기반으로 한 인사이트 리포트입니다.")
     st.write("")
     
-    if st.button("🔥 AI 심층 리포트 생성 (Gemini 3.6)", use_container_width=True, type="primary"):
+    if st.button("🔥 AI 심층 리포트 생성", use_container_width=True, type="primary"):
         if not api_key_input and "GEMINI_API_KEY" not in os.environ:
             st.error("사이드바에 Gemini API 키를 입력해 주세요.")
         else:
@@ -282,12 +286,12 @@ with tab2:
             st.error("데이터를 가져오는 중 오류가 발생했습니다.")
 
 # ========================================================
-# TAB 3: 🎯 목표 & 시뮬레이터
+# TAB 3: 🎯 목표 & 시뮬레이터 (색상 리뉴얼)
 # ========================================================
 with tab3:
     st.subheader("10년 복리 시뮬레이터")
     st.write("")
-    with st.expander("⚙️ 은퇴 및 목표 자산 설정 (터치하여 열기)"):
+    with st.expander("⚙️ 은퇴 및 목표 자산 설정"):
         target_farm = st.number_input("스마트팜 구축 ($)", value=300000)
         target_golf = st.number_input("정기 골프 펀드 ($)", value=100000)
         target_living = st.number_input("생활 자금 ($)", value=600000)
@@ -303,16 +307,16 @@ with tab3:
     
     years_sim = np.arange(0, 11)
     target_vals = current_asset * (1000 ** (years_sim/10))
-    fig_sim = go.Figure(go.Scatter(x=years_sim, y=target_vals, mode='lines+markers', line=dict(color='#ffb300', width=3)))
+    fig_sim = go.Figure(go.Scatter(x=years_sim, y=target_vals, mode='lines+markers', line=dict(color='#38BDF8', width=3)))
     fig_sim.update_layout(
         title="10년 1000배 성장 궤적",
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#ffffff'),
+        font=dict(color='#F8FAFC'),
         margin=dict(l=10, r=10, t=30, b=10),
-        legend=dict(orientation="h", y=-0.25, yanchor="top", font=dict(color='#ffffff')),
-        xaxis=dict(showgrid=True, gridcolor='#30363d', title="경과 년수", tickfont=dict(color='#ffffff')),
-        yaxis=dict(showgrid=True, gridcolor='#30363d', title="예상 자산 ($)", tickfont=dict(color='#ffffff'))
+        legend=dict(orientation="h", y=-0.25, yanchor="top", font=dict(color='#F8FAFC')),
+        xaxis=dict(showgrid=True, gridcolor='#1E293B', title="경과 년수", tickfont=dict(color='#F8FAFC')),
+        yaxis=dict(showgrid=True, gridcolor='#1E293B', title="예상 자산 ($)", tickfont=dict(color='#F8FAFC'))
     )
     st.plotly_chart(fig_sim, use_container_width=True)
 
@@ -338,14 +342,13 @@ with tab4:
                     st.error(f"오류: {e}")
 
 # ========================================================
-# TAB 5: 📝 투자 일지
+# TAB 5: 📝 투자 일지 (수정 및 삭제 기능 완벽 구현)
 # ========================================================
 with tab5:
     st.subheader("매매 복기 및 투자 일지")
-    st.write("")
     journal_file = "trading_journal.csv"
     
-    with st.expander("✍️ 새 일지 작성하기", expanded=True):
+    with st.expander("✍️ 새 일지 작성하기"):
         with st.form("journal_form"):
             c1, c2 = st.columns(2)
             j_date = c1.date_input("날짜", date.today())
@@ -353,16 +356,32 @@ with tab5:
             j_price = st.number_input("가격 ($)", min_value=0.0, format="%.2f")
             j_reason = st.text_area("결정 논리 및 전략 메모")
             
-            if st.form_submit_button("일지 저장", use_container_width=True):
+            if st.form_submit_button("신규 일지 추가", use_container_width=True):
                 new_data = pd.DataFrame([[j_date, ticker, j_action, j_price, j_reason]], columns=["Date", "Ticker", "Action", "Price", "Reason"])
                 if os.path.exists(journal_file):
                     df_journal = pd.concat([pd.read_csv(journal_file), new_data], ignore_index=True)
                 else:
                     df_journal = new_data
                 df_journal.to_csv(journal_file, index=False)
-                st.success("투자 일지가 안전하게 저장되었습니다!")
+                st.success("새로운 일지가 추가되었습니다!")
+                st.rerun() # 추가 후 화면 새로고침
 
     if os.path.exists(journal_file):
         st.write("")
-        st.markdown("### 📋 저장된 일지 목록")
-        st.dataframe(pd.read_csv(journal_file), use_container_width=True)
+        st.markdown("### 📋 일지 기록 (수정/삭제 가능)")
+        st.caption("💡 표 안의 글자를 더블클릭하여 바로 수정하거나, 좌측 체크박스를 선택해 삭제(Delete)할 수 있습니다.")
+        
+        df_journal = pd.read_csv(journal_file)
+        
+        # st.data_editor를 사용하여 엑셀처럼 실시간 수정/삭제 지원
+        edited_df = st.data_editor(
+            df_journal, 
+            num_rows="dynamic", # 이 옵션이 행 삭제/추가를 가능하게 합니다
+            use_container_width=True,
+            key="journal_editor"
+        )
+        
+        # 수정된 표를 다시 파일에 저장하는 버튼
+        if st.button("💾 변경된 일지 저장하기", use_container_width=True):
+            edited_df.to_csv(journal_file, index=False)
+            st.success("일지 변경사항이 완벽하게 저장되었습니다!")
