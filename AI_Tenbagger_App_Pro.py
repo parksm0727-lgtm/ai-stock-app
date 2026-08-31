@@ -110,29 +110,33 @@ with tab2:
         else:
             with st.spinner("최신 뉴스 분석 중..."):
                 stock_info = yf.Ticker(ticker)
-                recent_news = stock_info.news[:5] if stock_info.news else []
+                recent_news = stock_info.news[:10] if stock_info.news else [] # 넉넉하게 10개를 가져와서 필터링
                 
                 import datetime
-                current_year = datetime.date.today().year  # 시스템의 현재 연도를 동적으로 가져옴
+                current_year = datetime.date.today().year
                 
-                # 뉴스 제목과 날짜(타임스탬프)를 함께 추출
                 news_items = []
                 for news in recent_news:
                     title = news.get('title', '제목 없음')
                     pub_time = news.get('providerPublishTime', None)
+                    
+                    # 💡 타임스탬프가 존재하는 경우에만 날짜로 변환하여 포함
                     if pub_time:
                         date_str = datetime.datetime.fromtimestamp(pub_time).strftime('%Y-%m-%d')
+                        # 선택 사항: 올해(current_year) 기사만 엄격하게 필터링하고 싶다면 아래 주석을 해제하세요
+                        # if str(current_year) in date_str:
                         news_items.append(f"- [{date_str}] {title}")
                     else:
-                        news_items.append(f"- {title}")
+                        # 타임스탬프가 없는 경우 굳이 낡은 기사일 확률이 높으므로 제외하거나 표시
+                        continue 
                 
-                news_text = "\n".join(news_items) if news_items else "뉴스 없음"
+                news_text = "\n".join(news_items) if news_items else "발행일이 확인된 최신 뉴스가 없습니다."
                 
                 prompt = f"""
-                현재 시스템 기준 연도는 {current_year}년입니다. 아래는 종목 '{ticker}'의 수집된 최신 뉴스 목록(발행일 포함)입니다:
+                현재 시스템 기준 연도는 {current_year}년입니다. 아래는 종목 '{ticker}'의 발행일이 공식 확인된 실시간 뉴스 목록입니다:
                 {news_text}
                 
-                위 뉴스 목록의 [날짜]를 최우선으로 참고하여, 가장 최근에 보도된 실시간 뉴스를 기준으로 {current_year}년 현재 상황에 맞는 단기 급등 촉매제와 장기 리스크를 분석하고 요약해 줘.
+                위 뉴스 목록의 [날짜]를 바탕으로, 가장 최근에 보도된 실시간 뉴스를 기준으로 {current_year}년 현재 상황에 맞는 단기 급등 촉매제와 장기 리스크를 분석하고 요약해 줘.
                 """
                 
                 try:
