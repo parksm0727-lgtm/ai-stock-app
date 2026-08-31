@@ -10,18 +10,21 @@ import numpy as np
 import os
 import datetime
 
-# --- [1] 페이지 및 고가독성 다크 디자인 CSS 설정 ---
+# --- [1] 페이지 및 완벽한 다크 모드 CSS 강제 적용 ---
 st.set_page_config(page_title="AI 텐배거 프로", layout="centered", page_icon="📈")
 
 st.markdown("""
     <style>
-    /* 전체 배경 및 기본 글자 색상 */
-    .stApp {
-        background-color: #0b0f19;
-        color: #ffffff !important;
+    /* 1. 전체 배경 및 기본 텍스트 (다크 모드 강제 적용) */
+    .stApp, .main, [data-testid="stSidebar"] {
+        background-color: #0d1117 !important;
+        color: #c9d1d9 !important;
+    }
+    h1, h2, h3, h4, h5, h6, p, label, span {
+        color: #c9d1d9 !important;
     }
     
-    /* 타이틀 및 주요 텍스트 색상 고정 */
+    /* 2. 타이틀 그라데이션 */
     h1 {
         font-weight: 800 !important;
         letter-spacing: -0.5px;
@@ -29,77 +32,97 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         font-size: 1.8rem !important;
-        margin-bottom: 0.2rem !important;
-    }
-    
-    h2, h3, p, span, label {
-        color: #f0f6fc !important;
+        margin-bottom: 0.5rem !important;
     }
 
-    /* 카드 스타일 컨테이너 */
-    div[data-testid="stMetric"] {
+    /* 3. 카드형 컨테이너 (지표 등) */
+    [data-testid="stMetric"] {
         background-color: #161b22 !important;
         border: 1px solid #30363d !important;
-        padding: 15px !important;
         border-radius: 12px !important;
+        padding: 15px !important;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
     }
-    
-    div[data-testid="stMetricLabel"] label {
-        color: #8b949e !important;
-        font-size: 0.9rem !important;
-    }
-    div[data-testid="stMetricValue"] div {
+    [data-testid="stMetricValue"] div {
         color: #ffffff !important;
         font-weight: 700 !important;
     }
+    [data-testid="stMetricLabel"] label {
+        color: #8b949e !important;
+    }
 
-    /* 💡 [핵심 수정] 모든 입력창 및 날짜/숫자/텍스트 박스 가독성 완벽 개선 */
-    div[data-baseweb="input"], div[data-baseweb="base-input"], input, textarea, select {
+    /* 4. 💡 [핵심 해결] 아코디언 (Expander) 하얀 배경 겹침 현상 완벽 제거 */
+    [data-testid="stExpander"] {
         background-color: #161b22 !important;
+        border: 1px solid #30363d !important;
+        border-radius: 12px !important;
+    }
+    [data-testid="stExpander"] summary {
+        background-color: #161b22 !important;
+        border-radius: 12px !important;
+    }
+    [data-testid="stExpander"] summary p, [data-testid="stExpander"] summary span {
         color: #ffffff !important;
-        border-color: #30363d !important;
+        font-weight: 600 !important;
+    }
+    [data-testid="stExpander"] details {
+        background-color: #161b22 !important;
+    }
+
+    /* 5. 💡 [핵심 해결] 입력창 (텍스트, 날짜, 셀렉트박스 등) 가독성 극대화 */
+    .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea {
+        background-color: #0d1117 !important;
+        color: #ffffff !important;
+        border: 1px solid #30363d !important;
+        border-radius: 8px !important;
     }
     
-    input, textarea {
+    /* Selectbox (드롭다운) 전용 스타일 */
+    [data-baseweb="select"] > div {
+        background-color: #0d1117 !important;
         color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
+        border: 1px solid #30363d !important;
+        border-radius: 8px !important;
     }
-
-    /* 셀렉트박스 및 날짜 입력 컴포넌트 내부 텍스트 */
-    div[data-baseweb="select"] > div, div[data-baseweb="calendar"] {
+    [data-baseweb="select"] span {
+        color: #ffffff !important;
+    }
+    [data-baseweb="menu"], [data-baseweb="popover"] {
         background-color: #161b22 !important;
-        color: #ffffff !important;
+        border: 1px solid #30363d !important;
+    }
+    [data-baseweb="menu"] li {
+        color: #c9d1d9 !important;
+        background-color: transparent !important;
+    }
+    [data-baseweb="menu"] li:hover {
+        background-color: #30363d !important;
     }
 
-    /* 버튼 스타일 고급화 */
+    /* 6. 버튼 스타일 */
     .stButton>button {
-        background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+        background: linear-gradient(135deg, #238636 0%, #2ea043 100%) !important;
         color: white !important;
-        border: none;
-        border-radius: 8px;
-        font-weight: 600;
-        padding: 0.5rem 1rem;
-        box-shadow: 0 3px 4px rgba(0,0,0,0.2);
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        padding: 0.5rem 1rem !important;
     }
-
     button[kind="primary"] {
         background: linear-gradient(135deg, #ff4b4b 0%, #ff6b6b 100%) !important;
-        color: white !important;
     }
 
-    /* 탭 메뉴 글자 선명도 개선 */
+    /* 7. 탭 (Tabs) 디자인 */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 6px;
-        background-color: #161b22;
-        padding: 6px;
-        border-radius: 10px;
-        border: 1px solid #30363d;
+        background-color: #161b22 !important;
+        border: 1px solid #30363d !important;
+        border-radius: 10px !important;
+        padding: 5px !important;
+        gap: 5px !important;
     }
     .stTabs [data-baseweb="tab"] {
-        border-radius: 6px;
-        color: #c9d1d9 !important;
-        font-weight: 600;
+        color: #8b949e !important;
+        border-radius: 6px !important;
     }
     .stTabs [aria-selected="true"] {
         background-color: #30363d !important;
@@ -265,10 +288,10 @@ with tab3:
     st.subheader("10년 복리 시뮬레이터")
     st.write("")
     with st.expander("⚙️ 은퇴 및 목표 자산 설정 (터치하여 열기)"):
-        target_farm = st.number_input("스마트팜 구축", value=300000)
-        target_golf = st.number_input("정기 골프 펀드", value=100000)
-        target_living = st.number_input("생활 자금", value=600000)
-        current_asset = st.number_input("현재 투자 원금", value=10000)
+        target_farm = st.number_input("스마트팜 구축 ($)", value=300000)
+        target_golf = st.number_input("정기 골프 펀드 ($)", value=100000)
+        target_living = st.number_input("생활 자금 ($)", value=600000)
+        current_asset = st.number_input("현재 투자 원금 ($)", value=10000)
         
     total_target = target_farm + target_golf + target_living
     progress = min((current_asset / total_target) * 100, 100.0) if total_target > 0 else 0
