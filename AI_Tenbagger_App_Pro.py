@@ -12,7 +12,7 @@ import os
 import uuid
 
 # =========================================================
-# [1] 페이지 설정
+# [1] 페이지 설정 (반드시 가장 먼저 호출)
 # =========================================================
 st.set_page_config(page_title="AI 텐배거 프로", layout="centered", page_icon="📈")
 
@@ -46,7 +46,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (폭 꽉 찬 타이틀 배너 + 스크롤 최소화 압축 레이아웃)
+# [3] 디자인 시스템 (타이틀 잘림 현상 완벽 해결)
 # =========================================================
 st.markdown("""
 <style>
@@ -71,41 +71,27 @@ html, body, .stApp, [data-testid="stSidebar"], [data-testid="stHeader"] {
     color: var(--text) !important;
     font-family: 'Inter', 'Noto Sans KR', -apple-system, sans-serif !important;
 }
-h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
+h1, h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
-/* 💡 폭 방향에 꽉 차는 프리미엄 타이틀 배너 카드 */
-.title-banner {
-    background: linear-gradient(135deg, #141B2E 0%, #1B2438 100%);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px 18px;
-    margin-bottom: 8px;
-    text-align: center;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-}
-.title-main {
-    font-family: 'Inter', 'Noto Sans KR', sans-serif !important;
-    font-weight: 800 !important;
-    font-size: clamp(1.4rem, 5.5vw, 2rem) !important;
-    background: linear-gradient(90deg, #38BDF8 0%, #5B9DF9 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    margin: 0 !important;
+/* 💡 타이틀 크기를 화면에 맞게 최적화하고 잘림 방지 */
+h1 {
+    font-weight: 700 !important;
+    font-size: clamp(1.1rem, 4.2vw, 1.5rem) !important;
     line-height: 1.2 !important;
+    margin-bottom: 0.1rem !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+                 "Malgun Gothic", "맑은 고딕", Roboto, sans-serif !important;
+    color: var(--text) !important;
+    white-space: nowrap !important;
 }
-.title-sub {
-    color: var(--text-muted) !important;
-    font-size: 0.78rem !important;
-    margin-top: 3px !important;
-    letter-spacing: -0.2px;
-}
+h1 + div { color: var(--text-muted) !important; font-size: 0.8rem; }
 
 .hero-price {
-    padding: 2px 0 8px 0;
+    padding: 4px 0 10px 0;
     border-bottom: 1px solid var(--border);
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }
-.hero-label { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 1px; }
+.hero-label { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 2px; }
 .hero-value {
     font-family: 'JetBrains Mono', monospace;
     font-size: clamp(1.8rem, 7vw, 2.3rem);
@@ -113,26 +99,26 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     line-height: 1.1;
     color: var(--text);
 }
-.hero-delta { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; margin-top: 2px; }
+.hero-delta { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; font-weight: 600; margin-top: 2px; }
 .badge {
     display: inline-block; font-family: 'JetBrains Mono', monospace;
-    font-size: 0.75rem; padding: 2px 7px; border-radius: 6px;
-    border: 1px solid var(--border); margin-top: 6px; margin-right: 4px;
+    font-size: 0.75rem; padding: 2px 8px; border-radius: 6px;
+    border: 1px solid var(--border); margin-top: 6px; margin-right: 6px;
 }
 
 .mini-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
     gap: 8px;
-    margin: 2px 0 10px 0;
+    margin: 2px 0 12px 0;
 }
 .mini-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 8px 10px;
+    padding: 10px 12px;
 }
-.mini-label { color: var(--text-muted); font-size: 0.72rem; margin-bottom: 2px; }
+.mini-label { color: var(--text-muted); font-size: 0.74rem; margin-bottom: 2px; }
 .mini-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.15rem; color: var(--text); }
 .mini-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; margin-top: 2px; font-weight: 600; }
 
@@ -160,7 +146,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     border-radius: 8px !important;
     font-family: 'Inter', 'Noto Sans KR', sans-serif !important;
 }
-[data-baseweb="select"] > div { background-color: var(--surface-2) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; min-height: 2.2rem !important; }
+[data-baseweb="select"] > div { background-color: var(--surface-2) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
 [data-baseweb="menu"], [data-baseweb="popover"] { background-color: var(--surface) !important; border: 1px solid var(--border) !important; }
 [data-baseweb="menu"] li:hover { background-color: var(--surface-2) !important; }
 
@@ -186,7 +172,6 @@ button[kind="primary"] { background: linear-gradient(135deg, var(--accent) 0%, v
     border-radius: 6px !important;
     font-weight: 500 !important;
     font-size: 0.85rem !important;
-    padding: 4px 8px !important;
 }
 .stTabs [aria-selected="true"], [data-testid="stTabs"] button[aria-selected="true"] {
     background-color: var(--surface-2) !important;
@@ -194,24 +179,31 @@ button[kind="primary"] { background: linear-gradient(135deg, var(--accent) 0%, v
 }
 [data-testid="stTabs"] [data-baseweb="tab-highlight"] { background-color: transparent !important; }
 
-/* 💡 세로 스크롤을 최소화하기 위해 여백을 타이트하게 압축 */
+/* 💡 상단 여백을 넉넉하게 주어 핸드폰 상단바에 타이틀이 잘리지 않도록 함 */
 .block-container {
-    padding-top: 2.5rem !important;
-    padding-bottom: 0.8rem !important;
+    padding-top: 3.8rem !important;
+    padding-bottom: 1rem !important;
     padding-left: 0.8rem !important;
     padding-right: 0.8rem !important;
     max-width: 720px !important;
 }
 [data-testid="stVerticalBlock"] { gap: 0.2rem !important; }
 [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
+.hero-price { padding: 2px 0 6px 0 !important; margin-bottom: 6px !important; }
+.mini-grid { margin: 2px 0 4px 0 !important; }
+[data-testid="stSliderTickBar"] { margin-bottom: 0 !important; }
+[data-baseweb="select"] > div { min-height: 2.2rem !important; }
 .stTabs { margin-bottom: 0 !important; }
 
 @media (max-width: 480px) {
-    .block-container { padding-left: 0.5rem !important; padding-right: 0.5rem !important; padding-top: 2.2rem !important; }
-    .title-banner { padding: 10px 12px; margin-bottom: 6px; }
+    .block-container { padding-left: 0.5rem !important; padding-right: 0.5rem !important; padding-top: 3.5rem !important; }
+    h1 { font-size: clamp(1rem, 4vw, 1.35rem) !important; }
+    .hero-label { font-size: 0.75rem !important; margin-bottom: 0 !important; }
+    .hero-value { font-size: clamp(1.4rem, 7vw, 1.8rem) !important; }
+    .hero-delta { font-size: 0.85rem !important; margin-top: 2px !important; }
     .mini-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 6px !important; }
-    .mini-value { font-size: 1rem !important; }
-    .mini-label { font-size: 0.68rem !important; }
+    .mini-value { font-size: 1rem !important; white-space: nowrap; }
+    .mini-label { font-size: 0.65rem !important; }
     .mini-card { padding: 6px 8px !important; }
 }
 </style>
@@ -305,15 +297,9 @@ with st.sidebar:
     )
 
 # =========================================================
-# [7] 메인 화면: 폭 꽉 찬 타이틀 배너와 종목 컨트롤
+# [7] 메인 화면 타이틀 및 종목 선택
 # =========================================================
-st.markdown(
-    '<div class="title-banner">'
-    '<div class="title-main">📈 AI 텐배거 발굴기 Pro</div>'
-    '<div class="title-sub">Professional AI-Driven Stock & Retirement Intelligence</div>'
-    '</div>',
-    unsafe_allow_html=True
-)
+st.title("📈 AI 텐배거 발굴기 Pro")
 
 selected_index = (
     st.session_state["watchlist"].index(st.session_state["current_ticker"])
@@ -442,7 +428,7 @@ with tab1:
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             font=dict(color="#ECEFF4"), margin=dict(l=8, r=8, t=8, b=8),
             legend=dict(orientation="h", y=-0.14, yanchor="top", font=dict(size=10, color="#ECEFF4")),
-            height=280,
+            height=320,
         )
         fig_chart.update_xaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4"))
         fig_chart.update_yaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4"), row=1, col=1)
@@ -527,10 +513,9 @@ with tab3:
     fig_sim.update_layout(
         title=f"연 {annual_return_pct}% 복리 성장 궤적 (10년)",
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#ECEFF4"), margin=dict(l=10, r=10, t=30, b=10),
+        font=dict(color="#ECEFF4"), margin=dict(l=10, r=10, t=40, b=10),
         xaxis=dict(showgrid=True, gridcolor="#1E293B", title="경과 년수", tickfont=dict(color="#ECEFF4")),
         yaxis=dict(showgrid=True, gridcolor="#1E293B", title="예상 자산 ($)", tickfont=dict(color="#ECEFF4")),
-        height=260,
     )
     st.plotly_chart(fig_sim, use_container_width=True)
 
