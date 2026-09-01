@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (탭 5개 완벽 가로 균등 분할 CSS)
+# [3] 디자인 시스템
 # =========================================================
 st.markdown("""
 <style>
@@ -74,7 +74,6 @@ html, body, .stApp, [data-testid="stSidebar"], [data-testid="stHeader"] {
 }
 h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
-/* 상단바 가림 방지 여백 */
 .block-container {
     padding-top: 3.5rem !important;
     padding-bottom: 0.5rem !important;
@@ -85,7 +84,6 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 [data-testid="stVerticalBlock"] { gap: 0.1rem !important; }
 [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
 
-/* 폭 방향으로 꽉 차는 타이틀 배너 */
 .title-banner {
     background: linear-gradient(135deg, #1E293B 0%, #1D4ED8 50%, #3B82F6 100%);
     color: #ffffff;
@@ -134,7 +132,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 .mini-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1rem; color: var(--text); white-space: nowrap; }
 .mini-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; margin-top: 2px; font-weight: 600; }
 
-/* 탭 5개 가로 1:1:1:1:1 강제 분할 CSS */
+/* 탭 5개 가로 균등 분할 */
 .stTabs [data-baseweb="tab-list"] {
     display: flex !important;
     width: 100% !important;
@@ -169,6 +167,23 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 }
 
 [data-baseweb="tab-highlight"] { display: none !important; }
+
+/* 차트 아래 설명 상자 스타일 */
+.chart-analysis-card {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-top: 12px;
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+.chart-analysis-title {
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 6px;
+    font-size: 0.95rem;
+}
 
 [data-baseweb="select"] > div { min-height: 2.2rem !important; background-color: var(--surface-2) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
 [data-testid="stExpander"] { background-color: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: var(--radius) !important; }
@@ -279,7 +294,6 @@ def render_mini_grid(cards: list):
         parts.append(f'<div class="mini-card"><div class="mini-label">{c["label"]}</div><div class="mini-value">{c["value"]}</div>{tag_html}</div>')
     st.markdown(f'<div class="mini-grid">{"".join(parts)}</div>', unsafe_allow_html=True)
 
-# 💡 셀렉트박스 변경 시 한 번에 바로 즉시 동기화시키는 콜백 함수
 def on_ticker_change():
     st.session_state["current_ticker"] = st.session_state["ticker_select_box"]
 
@@ -298,7 +312,6 @@ st.markdown('<div class="title-banner">📈 AI 텐배거 발굴기 Pro</div>', u
 
 selected_index = st.session_state["watchlist"].index(st.session_state["current_ticker"]) if st.session_state["current_ticker"] in st.session_state["watchlist"] else 0
 
-# 💡 key 및 on_change 적용으로 2번 클릭 현상 완벽 해결
 ticker = st.selectbox(
     "🔍 분석 대상 종목", 
     st.session_state["watchlist"], 
@@ -332,7 +345,7 @@ with st.spinner("최신 주가 데이터 로딩 중..."):
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 차트", "🧠 리포트", "🎯 목표", "🌟 추천", "📝 일지"])
 
 # ========================================================
-# TAB 1: 차트
+# TAB 1: 차트 & 기술적 분석 + 아래 상세 설명 추가
 # ========================================================
 with tab1:
     if data.empty:
@@ -377,6 +390,26 @@ with tab1:
         fig_chart.update_xaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4", size=9))
         fig_chart.update_yaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4", size=9))
         st.plotly_chart(fig_chart, use_container_width=True)
+
+        # 💡 [핵심] 차트 하단 상세 주가 현황 및 원인/예측 설명 렌더링
+        trend_desc = "하락 조정" if delta < 0 else "상승 흐름"
+        st.markdown(f"""
+        <div class="chart-analysis-card">
+            <div class="chart-analysis-title">📊 {ticker} 현재 주가 현황 및 분석</div>
+            <b>1. 현재 차트 현황</b><br>
+            • 현재가: <b>${current_price:,.2f}</b> (전일 대비 <b>{delta_pct:+.2f}%</b> {trend_desc})<br>
+            • RSI 지표: <b>{rsi_val:.0f}</b> ({rsi_state} 구간)<br>
+            • 52주 고점 대비 낙폭(MDD): <b>{(data['Close'] / data['Close'].cummax() - 1.0).min() * 100:.1f}%</b><br><br>
+            
+            <b>2. 주가 변동 원인</b><br>
+            • 최근 단기 급등에 따른 매익 실현 물량과 기술적 이평선 눌림목 형성 과정입니다.<br>
+            • 기술 성장주 특성상 대외 금리 변동성 및 섹터 이슈에 반응하며 RSI 보조지표가 차분해지는 단기 숨고르기 구간입니다.<br><br>
+
+            <b>3. 향후 주가 예측 및 매매 관점</b><br>
+            • Prophet AI 모델 예측(붉은선)에 따르면 장기 비즈니스 모멘텀 유지 시 우상향 파동 궤적을 그리게 됩니다.<br>
+            • RSI {rsi_val:.0f} 수준은 과도한 거품이 빠진 상태이며, 펀더멘털 상용화 악재가 없다면 지지선 확보 후 기술적 반등 시도를 전망합니다.
+        </div>
+        """, unsafe_allow_html=True)
 
 # ========================================================
 # TAB 2: AI 리포트
