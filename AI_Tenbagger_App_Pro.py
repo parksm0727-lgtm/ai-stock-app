@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (타이틀 배너 완벽 노출 및 레이아웃 정리)
+# [3] 디자인 시스템 (깔끔한 타이틀 및 여백 설정)
 # =========================================================
 st.markdown("""
 <style>
@@ -67,39 +67,16 @@ st.markdown("""
     --radius: 8px;
 }
 
-/* 스트림릿 기본 헤더 비활성화 */
-[data-testid="stHeader"], header, .stAppHeader {
-    display: none !important;
-    height: 0px !important;
-}
-
-html, body, .stApp, [data-testid="stSidebar"] {
+html, body, .stApp, [data-testid="stSidebar"], [data-testid="stHeader"] {
     background-color: var(--bg) !important;
     color: var(--text) !important;
     font-family: 'Inter', 'Noto Sans KR', -apple-system, sans-serif !important;
 }
 h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
-/* 타이틀 배너 (독립적 높이와 안전 여백 확보) */
-.title-banner {
-    background: linear-gradient(135deg, #1E293B 0%, #1D4ED8 50%, #3B82F6 100%);
-    color: #ffffff;
-    text-align: center;
-    font-weight: 800;
-    font-size: clamp(1.1rem, 4.8vw, 1.5rem);
-    padding: 10px 6px !important;
-    border-radius: 12px;
-    margin: 15px 0 10px 0 !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    letter-spacing: -0.5px;
-    width: 100%;
-    border: 1.5px solid #38BDF8;
-    line-height: 1.2 !important;
-    box-sizing: border-box;
-}
-
+/* 💡 타이틀 영역 가림 해결 */
 .block-container {
-    padding-top: 0.8rem !important; 
+    padding-top: 2.2rem !important;
     padding-bottom: 0.5rem !important;
     padding-left: 0.6rem !important;
     padding-right: 0.6rem !important;
@@ -107,6 +84,20 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 }
 [data-testid="stVerticalBlock"] { gap: 0.1rem !important; }
 [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
+
+/* 타이틀 헤더 가독성 */
+.app-header {
+    text-align: center;
+    padding: 8px 0 12px 0;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+.app-title {
+    font-size: clamp(1.3rem, 5.5vw, 1.7rem);
+    font-weight: 800;
+    color: #5B9DF9;
+    margin: 0;
+}
 
 .hero-price {
     padding: 0px 0 6px 0 !important;
@@ -186,22 +177,29 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & AI 호출 (gemini-3.6-flash 대응)
+# [5] 데이터 로딩 & AI 호출 (최신 주가 및 최신 AI 모델 대응)
 # =========================================================
-@st.cache_data(ttl=3600, show_spinner=False)
+# 💡 최신 데이터 실시간 불러오기 (ttl 300초로 짧게 조정하여 최신 주가 보장)
+@st.cache_data(ttl=300, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
-    data = yf.download(t, start="2018-01-01", end=date.today().strftime("%Y-%m-%d"), progress=False, auto_adjust=True)
-    if data.empty: return data
-    data.reset_index(inplace=True)
-    if isinstance(data.columns, pd.MultiIndex): data.columns = [col[0] for col in data.columns]
-    return data
+    try:
+        tk = yf.Ticker(t)
+        data = tk.history(period="max", auto_adjust=True)
+        if data.empty:
+            return pd.DataFrame()
+        data.reset_index(inplace=True)
+        # 날짜 포맷 통일
+        data["Date"] = pd.to_datetime(data["Date"]).dt.tz_localize(None)
+        return data
+    except Exception:
+        return pd.DataFrame()
 
-@st.cache_data(ttl=1800, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def is_valid_ticker(t: str) -> bool:
     try: return not yf.Ticker(t).history(period="5d").empty
     except: return False
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=1800, show_spinner=False)
 def load_news(t: str) -> list:
     try: return yf.Ticker(t).news or []
     except: return []
@@ -215,7 +213,6 @@ def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
 @st.cache_data(ttl=21600, show_spinner=False)
 def cached_ai_text(api_key: str, model_name: str, prompt: str) -> str:
     client = genai.Client(api_key=api_key)
-    # 에러 메시지에서 제시된 gemini-3.6-flash 및 최신 플래시 모델 순차 호출
     target_models = ["gemini-3.6-flash", model_name, "gemini-2.5-flash"]
     
     last_err = None
@@ -248,9 +245,9 @@ with st.sidebar:
     model_name = st.text_input("Gemini 모델명", value="gemini-3.6-flash")
 
 # =========================================================
-# [7] 메인 타이틀 배너 & 종목 선택
+# [7] 메인 타이틀 & 종목 선택
 # =========================================================
-st.markdown('<div class="title-banner">📈 AI 텐배거 발굴기 Pro</div>', unsafe_allow_html=True)
+st.markdown('<div class="app-header"><div class="app-title">📈 AI 텐배거 발굴기 Pro</div></div>', unsafe_allow_html=True)
 
 selected_index = st.session_state["watchlist"].index(st.session_state["current_ticker"]) if st.session_state["current_ticker"] in st.session_state["watchlist"] else 0
 ticker = st.selectbox("🔍 분석 대상 종목", st.session_state["watchlist"], index=selected_index, label_visibility="collapsed")
@@ -271,7 +268,7 @@ with st.expander("➕ 종목 관리"):
         if st.session_state["current_ticker"] == del_ticker: st.session_state["current_ticker"] = st.session_state["watchlist"][0]
         st.rerun()
 
-with st.spinner("데이터 로딩 중..."):
+with st.spinner("최신 주가 데이터 로딩 중..."):
     data = load_price_data(ticker)
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 차트", "🧠 리포트", "🎯 목표", "🌟 추천", "📝 일지"])
@@ -281,7 +278,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 차트", "🧠 리포트", "🎯 �
 # ========================================================
 with tab1:
     if data.empty:
-        st.error(f"'{ticker}' 데이터를 불러올 수 없습니다.")
+        st.error(f"'{ticker}' 최신 데이터를 불러올 수 없습니다. 종목 코드를 확인해주세요.")
     else:
         data["RSI"] = RSIIndicator(close=data["Close"], window=14).rsi()
         current_price = float(data["Close"].iloc[-1])
@@ -290,7 +287,7 @@ with tab1:
         delta_pct = (delta / prev_close * 100) if prev_close else 0.0
         
         st.markdown(
-            f'<div class="hero-price"><div class="hero-label">{ticker} 현재가</div>'
+            f'<div class="hero-price"><div class="hero-label">{ticker} 최신가</div>'
             f'<div class="hero-value">${current_price:,.2f}</div>'
             f'<div class="hero-delta" style="color:{"var(--up)" if delta >= 0 else "var(--down)"};">{"▲" if delta >= 0 else "▼"} {abs(delta):,.2f} ({abs(delta_pct):.2f}%)</div></div>',
             unsafe_allow_html=True,
