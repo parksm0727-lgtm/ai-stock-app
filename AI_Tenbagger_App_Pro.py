@@ -168,23 +168,6 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
 [data-baseweb="tab-highlight"] { display: none !important; }
 
-/* 차트 아래 설명 상자 스타일 */
-.chart-analysis-card {
-    background-color: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 14px;
-    margin-top: 12px;
-    font-size: 0.88rem;
-    line-height: 1.5;
-}
-.chart-analysis-title {
-    font-weight: 700;
-    color: var(--accent);
-    margin-bottom: 6px;
-    font-size: 0.95rem;
-}
-
 [data-baseweb="select"] > div { min-height: 2.2rem !important; background-color: var(--surface-2) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
 [data-testid="stExpander"] { background-color: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: var(--radius) !important; }
 [data-testid="stExpander"] summary p { font-size: 0.85rem !important; padding: 4px 0 !important; }
@@ -345,7 +328,7 @@ with st.spinner("최신 주가 데이터 로딩 중..."):
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 차트", "🧠 리포트", "🎯 목표", "🌟 추천", "📝 일지"])
 
 # ========================================================
-# TAB 1: 차트 & 기술적 분석 + 아래 상세 설명 추가
+# TAB 1: 차트 & 순수 마크다운 분석 리포트
 # ========================================================
 with tab1:
     if data.empty:
@@ -366,9 +349,11 @@ with tab1:
 
         rsi_val = data["RSI"].iloc[-1]
         rsi_state = "과매수" if rsi_val >= 70 else ("과매도" if rsi_val <= 30 else "중립")
+        mdd_val = (data['Close'] / data['Close'].cummax() - 1.0).min() * 100
+
         render_mini_grid([
             {"label": "RSI(14)", "value": f"{rsi_val:.0f}", "tag": rsi_state, "tag_color": "var(--down)" if rsi_state == "과매수" else ("var(--up)" if rsi_state == "과매도" else "var(--text-muted)")},
-            {"label": "MDD", "value": f"{(data['Close'] / data['Close'].cummax() - 1.0).min() * 100:.1f}%"},
+            {"label": "MDD", "value": f"{mdd_val:.1f}%"},
             {"label": "52주 최고가", "value": f"${data['Close'].tail(252).max():,.1f}"},
         ])
 
@@ -391,25 +376,25 @@ with tab1:
         fig_chart.update_yaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4", size=9))
         st.plotly_chart(fig_chart, use_container_width=True)
 
-        # 💡 [핵심] 차트 하단 상세 주가 현황 및 원인/예측 설명 렌더링
+        # 💡 [해결] HTML 코드 블록 텍스트 깨짐 방지: Pure Markdown 컨테이너 출력
         trend_desc = "하락 조정" if delta < 0 else "상승 흐름"
+        st.markdown("---")
+        st.subheader(f"📊 {ticker} 현재 주가 현황 및 분석")
+        
         st.markdown(f"""
-        <div class="chart-analysis-card">
-            <div class="chart-analysis-title">📊 {ticker} 현재 주가 현황 및 분석</div>
-            <b>1. 현재 차트 현황</b><br>
-            • 현재가: <b>${current_price:,.2f}</b> (전일 대비 <b>{delta_pct:+.2f}%</b> {trend_desc})<br>
-            • RSI 지표: <b>{rsi_val:.0f}</b> ({rsi_state} 구간)<br>
-            • 52주 고점 대비 낙폭(MDD): <b>{(data['Close'] / data['Close'].cummax() - 1.0).min() * 100:.1f}%</b><br><br>
-            
-            <b>2. 주가 변동 원인</b><br>
-            • 최근 단기 급등에 따른 매익 실현 물량과 기술적 이평선 눌림목 형성 과정입니다.<br>
-            • 기술 성장주 특성상 대외 금리 변동성 및 섹터 이슈에 반응하며 RSI 보조지표가 차분해지는 단기 숨고르기 구간입니다.<br><br>
+**1. 현재 차트 현황**
+* **현재가**: **${current_price:,.2f}** (전일 대비 **{delta_pct:+.2f}%** {trend_desc})
+* **RSI 지표**: **{rsi_val:.0f}** ({rsi_state} 구간)
+* **52주 고점 대비 낙폭(MDD)**: **{mdd_val:.1f}%**
 
-            <b>3. 향후 주가 예측 및 매매 관점</b><br>
-            • Prophet AI 모델 예측(붉은선)에 따르면 장기 비즈니스 모멘텀 유지 시 우상향 파동 궤적을 그리게 됩니다.<br>
-            • RSI {rsi_val:.0f} 수준은 과도한 거품이 빠진 상태이며, 펀더멘털 상용화 악재가 없다면 지지선 확보 후 기술적 반등 시도를 전망합니다.
-        </div>
-        """, unsafe_allow_html=True)
+**2. 주가 변동 원인**
+* 최근 단기 급등에 따른 차익 실현 물량 소화 및 기술적 이평선 눌림목 형성 과정입니다.
+* 기술 성장주 특성상 대외 금리 변동성 및 섹터 이슈에 반응하며 RSI 보조지표가 차분해지는 단기 숨고르기 구간입니다.
+
+**3. 향후 주가 예측 및 매매 관점**
+* Prophet AI 모델 예측(붉은선)에 따르면 장기 비즈니스 모멘텀 유지 시 우상향 파동 궤적을 그리게 됩니다.
+* RSI {rsi_val:.0f} 수준은 과도한 거품이 빠진 상태이며, 펀더멘털 상용화 악재가 없다면 지지선 확보 후 기술적 반등 시도를 전망합니다.
+        """)
 
 # ========================================================
 # TAB 2: AI 리포트
