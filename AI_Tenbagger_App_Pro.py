@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (타이틀 두께 슬림화)
+# [3] 디자인 시스템 (상단바 가림 제거 및 배너 완벽 가독성)
 # =========================================================
 st.markdown("""
 <style>
@@ -67,38 +67,45 @@ st.markdown("""
     --radius: 8px;
 }
 
-html, body, .stApp, [data-testid="stSidebar"], [data-testid="stHeader"] {
+/* 💡 기본 헤더 투명화 및 높이 제거로 배너 침범 완벽 방지 */
+[data-testid="stHeader"], header, .stAppHeader {
+    background: transparent !important;
+    height: 0px !important;
+    min-height: 0px !important;
+}
+
+html, body, .stApp, [data-testid="stSidebar"] {
     background-color: var(--bg) !important;
     color: var(--text) !important;
     font-family: 'Inter', 'Noto Sans KR', -apple-system, sans-serif !important;
 }
 h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
-/* 💡 타이틀 배너 - 두께 슬림화 (위아래 padding 축소) */
+/* 💡 타이틀 배너 - 위아래 테두리 보장 및 여백 최적화 */
 .title-banner {
     background: linear-gradient(135deg, #1E293B 0%, #1D4ED8 50%, #3B82F6 100%);
     color: #ffffff;
     text-align: center;
     font-weight: 800;
-    font-size: clamp(1.4rem, 6vw, 1.8rem);
-    padding: 8px 10px !important; /* 두께 대폭 축소 */
+    font-size: clamp(1.3rem, 5.5vw, 1.7rem);
+    padding: 10px 12px !important;
     border-radius: 12px;
-    margin-top: 5px !important; 
-    margin-bottom: 12px !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    margin-top: 0px !important;
+    margin-bottom: 10px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     letter-spacing: -0.5px;
     width: 100%;
     border: 1px solid #38BDF8;
-    line-height: 1.2 !important; 
+    line-height: 1.3 !important;
     display: flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
 }
 
-/* 페이지 상단바 겹침 방지 여백 */
+/* 💡 컨테이너 상단 여백 보정 */
 .block-container {
-    padding-top: 4rem !important; 
+    padding-top: 1.5rem !important; 
     padding-bottom: 0.5rem !important;
     padding-left: 0.6rem !important;
     padding-right: 0.6rem !important;
@@ -197,7 +204,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & AI 호출
+# [5] 데이터 로딩 & AI 호출 (404 오류 해결 및 자동 폴백)
 # =========================================================
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -231,18 +238,22 @@ def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
 @st.cache_data(ttl=21600, show_spinner=False)
 def cached_ai_text(api_key: str, model_name: str, prompt: str) -> str:
     client = genai.Client(api_key=api_key)
+    # 💡 404 방지: 유효한 최신 모델 순서대로 폴백 시도
+    candidate_models = [model_name, "gemini-2.5-flash", "gemini-2.0-flash"]
     last_err = None
-    for attempt in range(3):
-        try:
-            return client.models.generate_content(model=model_name, contents=prompt).text
-        except Exception as e:
-            last_err = e
-            err_msg = str(e).lower()
-            if "503" in err_msg or "unavailable" in err_msg or "429" in err_msg:
-                time.sleep(2)
-                continue
-            else:
-                raise e
+    
+    for m in candidate_models:
+        if not m: continue
+        for attempt in range(2):
+            try:
+                return client.models.generate_content(model=m, contents=prompt).text
+            except Exception as e:
+                last_err = e
+                err_msg = str(e).lower()
+                if "503" in err_msg or "unavailable" in err_msg or "429" in err_msg:
+                    time.sleep(1)
+                    continue
+                break
     raise last_err
 
 def get_active_gemini_key(sidebar_key: str) -> str:
@@ -261,7 +272,8 @@ def render_mini_grid(cards: list):
 with st.sidebar:
     st.markdown("### ⚙️ 시스템 설정")
     api_key_input = st.text_input("Gemini API Key", type="password")
-    model_name = st.text_input("Gemini 모델명", value="gemini-1.5-flash")
+    # 최신 표준 모델명인 gemini-2.5-flash로 기본값 지정
+    model_name = st.text_input("Gemini 모델명", value="gemini-2.5-flash")
 
 # =========================================================
 # [7] 메인 화면 타이틀 배너 및 종목 선택
@@ -366,7 +378,7 @@ with tab2:
                 try: 
                     st.markdown(cached_ai_text(active_key, model_name, prompt))
                 except Exception as e: 
-                    st.error(f"서버 혼잡. (오류: {e})")
+                    st.error(f"오류: {e}")
 
 # ========================================================
 # TAB 3: 🎯 목표 & 시뮬레이터
@@ -404,10 +416,10 @@ with tab4:
                 try: 
                     st.markdown(cached_ai_text(active_key, model_name, f"현재 {date.today().year}년. '{sector_choice}' 10배 성장 유망 미국 중소형주 3곳 요약."))
                 except Exception as e: 
-                    st.error(f"서버 혼잡. (오류: {e})")
+                    st.error(f"오류: {e}")
 
 # ========================================================
-# TAB 5: 📝 투자 일지 (삭제 기능 완벽 복구)
+# TAB 5: 📝 투자 일지 (삭제 기능 포함)
 # ========================================================
 with tab5:
     def load_journal():
@@ -436,16 +448,14 @@ with tab5:
 
     df_journal = load_journal()
     if not df_journal.empty:
-        st.caption("💡 표 좌측 끝 상자를 선택하고, 우측 상단의 🗑️ 휴지통 아이콘을 누르면 삭제됩니다.")
-        
-        # 💡 [삭제 기능 복구] num_rows="dynamic"으로 설정하여 기본 삭제 UI 재활성화
+        st.caption("💡 표 좌측 체크박스 선택 후 🗑️ 아이콘 클릭시 삭제 가능합니다.")
         edited_df = st.data_editor(
             df_journal[df_journal["Ticker"] == ticker], 
             num_rows="dynamic", 
             hide_index=True, 
             key="j_editor",
             column_config={
-                "ID": st.column_config.TextColumn(disabled=True) # ID는 실수로 못 건드리게 잠금
+                "ID": st.column_config.TextColumn(disabled=True)
             }
         )
         
