@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (타이틀 무조건 한 줄 유지 CSS)
+# [3] 디자인 시스템 (메인 타이틀 좌우 꽉 차는 풀배너)
 # =========================================================
 st.markdown("""
 <style>
@@ -84,25 +84,26 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 [data-testid="stVerticalBlock"] { gap: 0.1rem !important; }
 [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
 
-/* 💡 무조건 한 줄 표시 타이틀 배너 */
+/* 💡 메인 타이틀 배너: 좌우 꽉 채움 + 무조건 한 줄 반응형 */
 .title-banner {
     background: linear-gradient(135deg, #1E293B 0%, #1D4ED8 50%, #3B82F6 100%);
     color: #ffffff;
     text-align: center;
     font-weight: 800;
-    font-size: clamp(0.95rem, 4.2vw, 1.5rem) !important; /* 반응형 자동 폰트 크기 조절 */
-    white-space: nowrap !important;                      /* 줄바꿈 완전히 금지 */
-    overflow: hidden !important;                         /* 넘어감 방지 */
+    font-size: clamp(0.95rem, 4.8vw, 1.6rem) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
     text-overflow: ellipsis !important;
-    padding: 10px 8px !important;
+    padding: 12px 10px !important;
     border-radius: 12px;
-    margin-bottom: 10px !important;
+    margin-bottom: 12px !important;
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     letter-spacing: -0.5px;
-    width: 100%;
+    width: 100% !important;
+    display: block !important;
     border: 1.5px solid #38BDF8;
     line-height: 1.2 !important;
-    box-sizing: border-box;
+    box-sizing: border-box !important;
 }
 
 .hero-price {
@@ -332,7 +333,7 @@ with st.spinner("최신 주가 데이터 로딩 중..."):
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 차트", "🧠 리포트", "🎯 목표", "🌟 추천", "📝 일지"])
 
 # ========================================================
-# TAB 1: 차트 & 순수 마크다운 분석 리포트
+# TAB 1: 차트 & 주가 현황 리포트
 # ========================================================
 with tab1:
     if data.empty:
@@ -382,7 +383,7 @@ with tab1:
 
         trend_desc = "하락 조정" if delta < 0 else "상승 흐름"
         st.markdown("---")
-        st.subheader(f"📊 {ticker} 현재 주가 현황 및 분석")
+        st.markdown(f"### 📊 {ticker} 주가 분석 및 예측")
         
         st.markdown(f"""
 **1. 현재 차트 현황**
