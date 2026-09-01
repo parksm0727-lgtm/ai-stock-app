@@ -13,12 +13,12 @@ import uuid
 import time
 
 # =========================================================
-# [1] 페이지 설정 (반드시 가장 먼저 호출)
+# [1] 페이지 설정
 # =========================================================
 st.set_page_config(page_title="AI 텐배거 프로", layout="centered", page_icon="📈")
 
 # =========================================================
-# [2] 앱 자체 테마 설정 파일 자동 생성
+# [2] 앱 테마 설정
 # =========================================================
 def ensure_theme_config():
     if st.session_state.get("_theme_checked"):
@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (상단바 가림 제거 및 배너 완벽 가독성)
+# [3] 디자인 시스템 (타이틀 테두리 가림 원천 차단)
 # =========================================================
 st.markdown("""
 <style>
@@ -67,11 +67,10 @@ st.markdown("""
     --radius: 8px;
 }
 
-/* 💡 기본 헤더 투명화 및 높이 제거로 배너 침범 완벽 방지 */
+/* 💡 스트림릿 상단 기본 헤더 요소 완전 비활성화 (배너 하단 잘림 해결) */
 [data-testid="stHeader"], header, .stAppHeader {
-    background: transparent !important;
+    display: none !important;
     height: 0px !important;
-    min-height: 0px !important;
 }
 
 html, body, .stApp, [data-testid="stSidebar"] {
@@ -81,31 +80,27 @@ html, body, .stApp, [data-testid="stSidebar"] {
 }
 h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
-/* 💡 타이틀 배너 - 위아래 테두리 보장 및 여백 최적화 */
+/* 💡 타이틀 배너 (상하 테두리가 잘리지 않는 안정적 높이 및 패딩) */
 .title-banner {
     background: linear-gradient(135deg, #1E293B 0%, #1D4ED8 50%, #3B82F6 100%);
     color: #ffffff;
     text-align: center;
     font-weight: 800;
-    font-size: clamp(1.3rem, 5.5vw, 1.7rem);
-    padding: 10px 12px !important;
+    font-size: clamp(1.2rem, 5vw, 1.6rem);
+    padding: 12px 8px !important;
     border-radius: 12px;
-    margin-top: 0px !important;
-    margin-bottom: 10px !important;
+    margin: 10px 0 12px 0 !important;
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     letter-spacing: -0.5px;
     width: 100%;
-    border: 1px solid #38BDF8;
-    line-height: 1.3 !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    border: 1.5px solid #38BDF8;
+    line-height: 1.2 !important;
+    display: block;
     box-sizing: border-box;
 }
 
-/* 💡 컨테이너 상단 여백 보정 */
 .block-container {
-    padding-top: 1.5rem !important; 
+    padding-top: 1rem !important; 
     padding-bottom: 0.5rem !important;
     padding-left: 0.6rem !important;
     padding-right: 0.6rem !important;
@@ -114,7 +109,6 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 [data-testid="stVerticalBlock"] { gap: 0.1rem !important; }
 [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
 
-/* 현재가 블록 공간 축소 */
 .hero-price {
     padding: 0px 0 6px 0 !important;
     border-bottom: 1px solid var(--border);
@@ -129,13 +123,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     color: var(--text);
 }
 .hero-delta { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 600; margin-top: 2px; }
-.badge {
-    display: inline-block; font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem; padding: 2px 6px; border-radius: 4px;
-    border: 1px solid var(--border); margin-top: 4px; margin-right: 4px;
-}
 
-/* 미니 지표 카드 */
 .mini-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -152,7 +140,6 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 .mini-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1rem; color: var(--text); white-space: nowrap; }
 .mini-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; margin-top: 2px; font-weight: 600; }
 
-/* 탭 높이 */
 .stTabs [data-baseweb="tab-list"], [data-testid="stTabs"] [role="tablist"] {
     background-color: var(--surface) !important;
     border: 1px solid var(--border) !important;
@@ -171,13 +158,10 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     color: var(--accent) !important;
 }
 [data-testid="stTabs"] [data-baseweb="tab-highlight"] { display: none !important; }
-.stTabs { margin-bottom: 0 !important; }
 
-/* 셀렉트박스 및 버튼 */
 [data-baseweb="select"] > div { min-height: 2.2rem !important; background-color: var(--surface-2) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
-[data-testid="stExpander"] { background-color: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: var(--radius) !important; margin-bottom: 0px !important; }
+[data-testid="stExpander"] { background-color: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: var(--radius) !important; }
 [data-testid="stExpander"] summary p { font-size: 0.85rem !important; padding: 4px 0 !important; }
-[data-testid="stSliderTickBar"] { display: none !important; }
 
 .stButton>button {
     background: var(--accent-strong) !important;
@@ -188,7 +172,6 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     padding: 0.5rem 1rem !important;
 }
 button[kind="primary"] { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%) !important; }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -204,7 +187,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & AI 호출 (404 오류 해결 및 자동 폴백)
+# [5] 데이터 로딩 & AI 호출 (최신 gemini-2.5-flash 지원)
 # =========================================================
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -225,11 +208,6 @@ def load_news(t: str) -> list:
     except: return []
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def load_institutional_holders(t: str):
-    try: return yf.Ticker(t).institutional_holders
-    except: return None
-
-@st.cache_data(ttl=3600, show_spinner=False)
 def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
     m = Prophet(daily_seasonality=False)
     m.fit(df_train)
@@ -238,22 +216,18 @@ def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
 @st.cache_data(ttl=21600, show_spinner=False)
 def cached_ai_text(api_key: str, model_name: str, prompt: str) -> str:
     client = genai.Client(api_key=api_key)
-    # 💡 404 방지: 유효한 최신 모델 순서대로 폴백 시도
-    candidate_models = [model_name, "gemini-2.5-flash", "gemini-2.0-flash"]
-    last_err = None
+    # 💡 404 및 권장 모델 명시 대응: gemini-2.5-flash 표준 사용
+    target_models = ["gemini-2.5-flash", "gemini-2.0-flash", model_name]
     
-    for m in candidate_models:
+    last_err = None
+    for m in target_models:
         if not m: continue
-        for attempt in range(2):
-            try:
-                return client.models.generate_content(model=m, contents=prompt).text
-            except Exception as e:
-                last_err = e
-                err_msg = str(e).lower()
-                if "503" in err_msg or "unavailable" in err_msg or "429" in err_msg:
-                    time.sleep(1)
-                    continue
-                break
+        try:
+            return client.models.generate_content(model=m, contents=prompt).text
+        except Exception as e:
+            last_err = e
+            continue
+            
     raise last_err
 
 def get_active_gemini_key(sidebar_key: str) -> str:
@@ -272,11 +246,10 @@ def render_mini_grid(cards: list):
 with st.sidebar:
     st.markdown("### ⚙️ 시스템 설정")
     api_key_input = st.text_input("Gemini API Key", type="password")
-    # 최신 표준 모델명인 gemini-2.5-flash로 기본값 지정
     model_name = st.text_input("Gemini 모델명", value="gemini-2.5-flash")
 
 # =========================================================
-# [7] 메인 화면 타이틀 배너 및 종목 선택
+# [7] 메인 타이틀 배너 & 종목 선택
 # =========================================================
 st.markdown('<div class="title-banner">📈 AI 텐배거 발굴기 Pro</div>', unsafe_allow_html=True)
 
@@ -305,26 +278,22 @@ with st.spinner("데이터 로딩 중..."):
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 차트", "🧠 리포트", "🎯 목표", "🌟 추천", "📝 일지"])
 
 # ========================================================
-# TAB 1: 📈 차트 & 기술적 분석
+# TAB 1: 차트
 # ========================================================
 with tab1:
     if data.empty:
         st.error(f"'{ticker}' 데이터를 불러올 수 없습니다.")
     else:
         data["RSI"] = RSIIndicator(close=data["Close"], window=14).rsi()
-        data["MA50"] = data["Close"].rolling(50).mean()
-        data["MA200"] = data["Close"].rolling(200).mean()
-
         current_price = float(data["Close"].iloc[-1])
         prev_close = float(data["Close"].iloc[-2]) if len(data) > 1 else current_price
         delta = current_price - prev_close
         delta_pct = (delta / prev_close * 100) if prev_close else 0.0
-        delta_color = "var(--up)" if delta >= 0 else "var(--down)"
         
         st.markdown(
             f'<div class="hero-price"><div class="hero-label">{ticker} 현재가</div>'
             f'<div class="hero-value">${current_price:,.2f}</div>'
-            f'<div class="hero-delta" style="color:{delta_color};">{"▲" if delta >= 0 else "▼"} {abs(delta):,.2f} ({abs(delta_pct):.2f}%)</div></div>',
+            f'<div class="hero-delta" style="color:{"var(--up)" if delta >= 0 else "var(--down)"};">{"▲" if delta >= 0 else "▼"} {abs(delta):,.2f} ({abs(delta_pct):.2f}%)</div></div>',
             unsafe_allow_html=True,
         )
 
@@ -345,8 +314,6 @@ with tab1:
         fig_chart = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.75, 0.25], vertical_spacing=0.03)
         fig_chart.add_trace(go.Scatter(x=df_train["ds"], y=df_train["y"], mode="markers", marker=dict(color="#64748B", size=2)), row=1, col=1)
         fig_chart.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], mode="lines", line=dict(color="#F43F5E", width=2)), row=1, col=1)
-        fig_chart.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat_upper"], mode="lines", line=dict(width=0), showlegend=False), row=1, col=1)
-        fig_chart.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat_lower"], mode="lines", line=dict(width=0), fillcolor="rgba(244,63,94,0.15)", fill="tonexty"), row=1, col=1)
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["RSI"], mode="lines", line=dict(color="#A78BFA", width=1)), row=2, col=1)
 
         fig_chart.update_layout(
@@ -358,7 +325,7 @@ with tab1:
         st.plotly_chart(fig_chart, use_container_width=True)
 
 # ========================================================
-# TAB 2: 🧠 AI 촉매제 리포트
+# TAB 2: AI 리포트
 # ========================================================
 with tab2:
     active_key = get_active_gemini_key(api_key_input)
@@ -368,20 +335,16 @@ with tab2:
         else:
             with st.spinner("분석 중..."):
                 recent_news = load_news(ticker)[:10]
-                news_items = []
-                for item in recent_news:
-                    content = item.get("content", {}) if isinstance(item, dict) else {}
-                    title = content.get("title") or item.get("title", "제목 없음")
-                    news_items.append(f"- {title}")
+                news_items = [f"- {item.get('content', {}).get('title') or item.get('title', '제목 없음')}" for item in recent_news]
                 news_text = "\n".join(news_items) if news_items else "최신 뉴스가 없습니다."
-                prompt = f"현재 시점은 {date.today().year}년입니다. '{ticker}' 최신 뉴스:\n{news_text}\n이를 바탕으로 단기 촉매제와 장기 리스크 요약해 줘."
+                prompt = f"현재 {date.today().year}년 기준. 종목 '{ticker}' 관련 뉴스:\n{news_text}\n핵심 단기 촉매와 리스크 요약."
                 try: 
                     st.markdown(cached_ai_text(active_key, model_name, prompt))
                 except Exception as e: 
-                    st.error(f"오류: {e}")
+                    st.error(f"오류 발생: {e}")
 
 # ========================================================
-# TAB 3: 🎯 목표 & 시뮬레이터
+# TAB 3: 목표
 # ========================================================
 with tab3:
     with st.expander("⚙️ 설정", expanded=True):
@@ -404,22 +367,23 @@ with tab3:
     st.plotly_chart(fig_sim, use_container_width=True)
 
 # ========================================================
-# TAB 4: 🌟 AI 텐배거 추천
+# TAB 4: 추천
 # ========================================================
 with tab4:
     sector_choice = st.selectbox("분야 선택", ["우주 항공 및 통신", "AI 바이오 헬스케어", "차세대 에너지 (SMR)", "양자 컴퓨팅"])
     if st.button("✨ 추천받기", use_container_width=True):
         active_key = get_active_gemini_key(api_key_input)
-        if not active_key: st.error("API 키 필요")
+        if not active_key: 
+            st.error("API 키 필요")
         else:
             with st.spinner("분석 중..."):
                 try: 
-                    st.markdown(cached_ai_text(active_key, model_name, f"현재 {date.today().year}년. '{sector_choice}' 10배 성장 유망 미국 중소형주 3곳 요약."))
+                    st.markdown(cached_ai_text(active_key, model_name, f"현재 시점 {date.today().year}년. '{sector_choice}' 분야 10배 성장 유망 중소형주 3개 요약."))
                 except Exception as e: 
-                    st.error(f"오류: {e}")
+                    st.error(f"오류 발생: {e}")
 
 # ========================================================
-# TAB 5: 📝 투자 일지 (삭제 기능 포함)
+# TAB 5: 일지
 # ========================================================
 with tab5:
     def load_journal():
@@ -448,18 +412,15 @@ with tab5:
 
     df_journal = load_journal()
     if not df_journal.empty:
-        st.caption("💡 표 좌측 체크박스 선택 후 🗑️ 아이콘 클릭시 삭제 가능합니다.")
+        st.caption("💡 표 체크박스로 행을 선택한 후 우측 상단 🗑️ 아이콘을 누르면 삭제됩니다.")
         edited_df = st.data_editor(
             df_journal[df_journal["Ticker"] == ticker], 
             num_rows="dynamic", 
             hide_index=True, 
             key="j_editor",
-            column_config={
-                "ID": st.column_config.TextColumn(disabled=True)
-            }
+            column_config={"ID": st.column_config.TextColumn(disabled=True)}
         )
-        
-        if st.button("💾 변경 및 삭제 저장", use_container_width=True):
+        if st.button("💾 저장", use_container_width=True):
             other_rows = df_journal[df_journal["Ticker"] != ticker]
             save_journal(pd.concat([other_rows, edited_df], ignore_index=True))
             st.rerun()
