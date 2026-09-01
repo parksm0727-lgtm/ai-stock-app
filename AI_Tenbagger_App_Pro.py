@@ -84,6 +84,10 @@ h1 {
     font-size: clamp(1.3rem, 5vw, 1.85rem) !important;
     line-height: 1.3 !important;
     margin-bottom: 0.1rem !important;
+    /* 구글 폰트(외부 네트워크) 로딩이 막히는 환경이 있어, 제목만큼은 기기에
+       이미 설치된 한글 시스템 폰트를 직접 지정해 항상 정상 표시되도록 함 */
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+                 "Malgun Gothic", "맑은 고딕", Roboto, sans-serif !important;
 }
 h1 + div { color: var(--text-muted) !important; font-size: 0.9rem; }
 
@@ -186,26 +190,32 @@ button[kind="primary"] { background: linear-gradient(135deg, var(--accent) 0%, v
 
 /* 전반적인 여백 축소 (모바일에서 카드 사이 공백이 과도했던 문제 + 스크롤 최소화) */
 .block-container {
-    padding-top: 0.9rem !important;
-    padding-bottom: 1.2rem !important;
+    padding-top: 0.6rem !important;
+    padding-bottom: 1rem !important;
     padding-left: 1rem !important;
     padding-right: 1rem !important;
     max-width: 720px !important;
 }
-[data-testid="stVerticalBlock"] { gap: 0.35rem !important; }
+[data-testid="stVerticalBlock"] { gap: 0.25rem !important; }
 [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
 h1 { margin-top: 0 !important; }
-.hero-price { padding: 4px 0 10px 0 !important; margin-bottom: 10px !important; }
-.mini-grid { margin: 2px 0 10px 0 !important; }
+.hero-price { padding: 2px 0 8px 0 !important; margin-bottom: 8px !important; }
+.mini-grid { margin: 2px 0 6px 0 !important; }
 [data-testid="stSliderTickBar"] { margin-bottom: 0 !important; }
+[data-baseweb="select"] > div { min-height: 2.4rem !important; }
+.stTabs { margin-bottom: 0 !important; }
 
 /* 화면 크기별 자동 조정: 작은 화면일수록 여백/글자 크기를 한 단계씩 더 줄임 */
 @media (max-width: 480px) {
-    .block-container { padding-left: 0.7rem !important; padding-right: 0.7rem !important; }
-    .hero-value { font-size: clamp(1.7rem, 9vw, 2.2rem) !important; }
-    .mini-grid { grid-template-columns: repeat(2, 1fr) !important; }
-    .mini-value { font-size: 1.15rem !important; white-space: nowrap; }
-    .mini-card { padding: 9px 10px !important; }
+    .block-container { padding-left: 0.6rem !important; padding-right: 0.6rem !important; padding-top: 0.4rem !important; }
+    h1 { font-size: clamp(1.15rem, 4.5vw, 1.5rem) !important; }
+    .hero-label { font-size: 0.78rem !important; margin-bottom: 0 !important; }
+    .hero-value { font-size: clamp(1.5rem, 8vw, 1.9rem) !important; }
+    .hero-delta { font-size: 0.9rem !important; margin-top: 2px !important; }
+    .mini-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+    .mini-value { font-size: 1.1rem !important; white-space: nowrap; }
+    .mini-label { font-size: 0.7rem !important; }
+    .mini-card { padding: 8px 10px !important; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -295,7 +305,7 @@ def render_mini_grid(cards: list):
 
 
 # =========================================================
-# [6] 사이드바: 설정 및 종목 관리
+# [6] 사이드바: 시스템 설정 (API 키/모델)
 # =========================================================
 with st.sidebar:
     st.markdown("### ⚙️ 시스템 설정")
@@ -305,8 +315,20 @@ with st.sidebar:
         help="Google이 모델명을 자주 교체하므로, 오류가 나면 최신 모델명(예: gemini-2.5-flash)으로 바꿔보세요."
     )
 
-    st.divider()
-    st.markdown("### ➕ 관심 종목 관리")
+# =========================================================
+# [7] 메인 화면 타이틀 및 종목 선택
+# =========================================================
+st.title("📈 AI 텐배거 발굴기 Pro")
+
+selected_index = (
+    st.session_state["watchlist"].index(st.session_state["current_ticker"])
+    if st.session_state["current_ticker"] in st.session_state["watchlist"] else 0
+)
+ticker = st.selectbox("🔍 분석 대상 종목", st.session_state["watchlist"], index=selected_index)
+st.session_state["current_ticker"] = ticker
+
+# 종목 추가/삭제는 사이드바에 숨기지 않고 여기서 바로 처리 (모바일에서는 사이드바가 잘 안 보임)
+with st.expander("➕ 종목 추가 / 삭제"):
     new_ticker = st.text_input("새 종목 코드 추가", placeholder="예: NVDA")
     if st.button("종목 추가", use_container_width=True):
         t = new_ticker.upper().strip()
@@ -321,7 +343,8 @@ with st.sidebar:
             st.session_state["current_ticker"] = t
             st.rerun()
 
-    del_ticker = st.selectbox("삭제할 종목 선택", st.session_state["watchlist"])
+    st.divider()
+    del_ticker = st.selectbox("삭제할 종목 선택", st.session_state["watchlist"], key="del_ticker_main")
     can_delete = len(st.session_state["watchlist"]) > 1
     if st.button("종목 삭제", use_container_width=True, disabled=not can_delete):
         st.session_state["watchlist"].remove(del_ticker)
@@ -331,18 +354,6 @@ with st.sidebar:
     if not can_delete:
         st.caption("⚠️ 최소 1개 종목은 유지되어야 합니다.")
 
-# =========================================================
-# [7] 메인 화면 타이틀 및 종목 선택
-# =========================================================
-st.title("📈 AI 텐배거 발굴기 Pro")
-st.caption("Professional AI-Driven Stock & Retirement Intelligence")
-
-selected_index = (
-    st.session_state["watchlist"].index(st.session_state["current_ticker"])
-    if st.session_state["current_ticker"] in st.session_state["watchlist"] else 0
-)
-ticker = st.selectbox("🔍 분석 대상 종목", st.session_state["watchlist"], index=selected_index)
-st.session_state["current_ticker"] = ticker
 
 with st.spinner(f"{ticker} 데이터 불러오는 중..."):
     data = load_price_data(ticker)
@@ -439,7 +450,7 @@ with tab1:
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             font=dict(color="#ECEFF4"), margin=dict(l=8, r=8, t=8, b=8),
             legend=dict(orientation="h", y=-0.14, yanchor="top", font=dict(size=10, color="#ECEFF4")),
-            height=360,
+            height=320,
         )
         fig_chart.update_xaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4"))
         fig_chart.update_yaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4"), row=1, col=1)
