@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (타이틀 가림 방지 상단 여백 4.2rem 확보)
+# [3] 디자인 시스템 (폭 채움 배너 & 상단바 여백 최적화)
 # =========================================================
 st.markdown("""
 <style>
@@ -74,9 +74,9 @@ html, body, .stApp, [data-testid="stSidebar"], [data-testid="stHeader"] {
 }
 h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
-/* 💡 타이틀 잘림 방지: 상단 패딩을 4.2rem으로 확장 */
+/* 💡 상단바 가림 방지 여백 */
 .block-container {
-    padding-top: 4.2rem !important;
+    padding-top: 3.5rem !important;
     padding-bottom: 0.5rem !important;
     padding-left: 0.6rem !important;
     padding-right: 0.6rem !important;
@@ -85,18 +85,22 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 [data-testid="stVerticalBlock"] { gap: 0.1rem !important; }
 [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
 
-/* 헤더 상단 가독성 스타일 */
-.app-header {
+/* 💡 폭 방향으로 꽉 차는 타이틀 배너 */
+.title-banner {
+    background: linear-gradient(135deg, #1E293B 0%, #1D4ED8 50%, #3B82F6 100%);
+    color: #ffffff;
     text-align: center;
-    padding: 4px 0 10px 0;
-    margin-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-}
-.app-title {
-    font-size: clamp(1.3rem, 5.5vw, 1.7rem);
     font-weight: 800;
-    color: #5B9DF9;
-    margin: 0;
+    font-size: clamp(1.3rem, 5.5vw, 1.7rem);
+    padding: 10px 12px !important;
+    border-radius: 12px;
+    margin-bottom: 10px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    letter-spacing: -0.5px;
+    width: 100%;
+    border: 1.5px solid #38BDF8;
+    line-height: 1.3 !important;
+    box-sizing: border-box;
 }
 
 .hero-price {
@@ -166,7 +170,7 @@ button[kind="primary"] { background: linear-gradient(135deg, var(--accent) 0%, v
 """, unsafe_allow_html=True)
 
 # =========================================================
-# [4] 파일 기반 관심 종목 및 일지 영구 저장 관리
+# [4] 데이터 및 상태 초기화
 # =========================================================
 WATCHLIST_FILE = "watchlist.json"
 DEFAULT_WATCHLIST = ["ASTS", "OKLO", "IONQ", "RXRX", "PLTR", "TSLA"]
@@ -187,13 +191,19 @@ def save_watchlist(watchlist):
         with open(WATCHLIST_FILE, "w", encoding="utf-8") as f:
             json.dump(watchlist, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        st.error(f"종목 목록 저장 실패: {e}")
+        st.error(f"저장 실패: {e}")
 
 if "watchlist" not in st.session_state:
     st.session_state["watchlist"] = load_saved_watchlist()
 
 if "current_ticker" not in st.session_state or st.session_state["current_ticker"] not in st.session_state["watchlist"]:
     st.session_state["current_ticker"] = st.session_state["watchlist"][0]
+
+# AI 생성 데이터 상태 유지
+if "ai_report_cache" not in st.session_state:
+    st.session_state["ai_report_cache"] = {}
+if "ai_recommend_cache" not in st.session_state:
+    st.session_state["ai_recommend_cache"] = {}
 
 JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
@@ -230,11 +240,9 @@ def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
     m.fit(df_train)
     return m.predict(m.make_future_dataframe(periods=years * 365))
 
-@st.cache_data(ttl=21600, show_spinner=False)
-def cached_ai_text(api_key: str, model_name: str, prompt: str) -> str:
+def get_ai_text(api_key: str, model_name: str, prompt: str) -> str:
     client = genai.Client(api_key=api_key)
     target_models = ["gemini-3.6-flash", model_name, "gemini-2.5-flash"]
-    
     last_err = None
     for m in target_models:
         if not m: continue
@@ -243,7 +251,6 @@ def cached_ai_text(api_key: str, model_name: str, prompt: str) -> str:
         except Exception as e:
             last_err = e
             continue
-            
     raise last_err
 
 def get_active_gemini_key(sidebar_key: str) -> str:
@@ -267,7 +274,7 @@ with st.sidebar:
 # =========================================================
 # [7] 메인 타이틀 & 종목 선택
 # =========================================================
-st.markdown('<div class="app-header"><div class="app-title">📈 AI 텐배거 발굴기 Pro</div></div>', unsafe_allow_html=True)
+st.markdown('<div class="title-banner">📈 AI 텐배거 발굴기 Pro</div>', unsafe_allow_html=True)
 
 selected_index = st.session_state["watchlist"].index(st.session_state["current_ticker"]) if st.session_state["current_ticker"] in st.session_state["watchlist"] else 0
 ticker = st.selectbox("🔍 분석 대상 종목", st.session_state["watchlist"], index=selected_index, label_visibility="collapsed")
@@ -280,7 +287,7 @@ with st.expander("➕ 종목 관리"):
         if t and is_valid_ticker(t) and t not in st.session_state["watchlist"]:
             st.session_state["watchlist"].append(t)
             st.session_state["current_ticker"] = t
-            save_watchlist(st.session_state["watchlist"]) # 파일로 영구 저장
+            save_watchlist(st.session_state["watchlist"])
             st.rerun()
 
     del_ticker = st.selectbox("삭제할 종목 선택", st.session_state["watchlist"], key="del_ticker_main", label_visibility="collapsed")
@@ -288,7 +295,7 @@ with st.expander("➕ 종목 관리"):
         st.session_state["watchlist"].remove(del_ticker)
         if st.session_state["current_ticker"] == del_ticker: 
             st.session_state["current_ticker"] = st.session_state["watchlist"][0]
-        save_watchlist(st.session_state["watchlist"]) # 파일로 영구 저장
+        save_watchlist(st.session_state["watchlist"])
         st.rerun()
 
 with st.spinner("최신 주가 데이터 로딩 중..."):
@@ -344,7 +351,7 @@ with tab1:
         st.plotly_chart(fig_chart, use_container_width=True)
 
 # ========================================================
-# TAB 2: AI 리포트
+# TAB 2: AI 리포트 (생성 결과 유지를 위한 세션 스토리지)
 # ========================================================
 with tab2:
     active_key = get_active_gemini_key(api_key_input)
@@ -358,9 +365,14 @@ with tab2:
                 news_text = "\n".join(news_items) if news_items else "최신 뉴스가 없습니다."
                 prompt = f"현재 {date.today().year}년 기준. 종목 '{ticker}' 관련 뉴스:\n{news_text}\n핵심 단기 촉매와 리스크 요약."
                 try: 
-                    st.markdown(cached_ai_text(active_key, model_name, prompt))
+                    res = get_ai_text(active_key, model_name, prompt)
+                    st.session_state["ai_report_cache"][ticker] = res
                 except Exception as e: 
                     st.error(f"오류 발생: {e}")
+
+    # 기존 생성된 리포트가 있으면 유지하여 출력
+    if ticker in st.session_state["ai_report_cache"]:
+        st.markdown(st.session_state["ai_report_cache"][ticker])
 
 # ========================================================
 # TAB 3: 목표
@@ -386,7 +398,7 @@ with tab3:
     st.plotly_chart(fig_sim, use_container_width=True)
 
 # ========================================================
-# TAB 4: 추천
+# TAB 4: 추천 (생성 결과 유지를 위한 세션 스토리지)
 # ========================================================
 with tab4:
     sector_choice = st.selectbox("분야 선택", ["우주 항공 및 통신", "AI 바이오 헬스케어", "차세대 에너지 (SMR)", "양자 컴퓨팅"])
@@ -397,9 +409,14 @@ with tab4:
         else:
             with st.spinner("분석 중..."):
                 try: 
-                    st.markdown(cached_ai_text(active_key, model_name, f"현재 시점 {date.today().year}년. '{sector_choice}' 분야 10배 성장 유망 중소형주 3개 요약."))
+                    res = get_ai_text(active_key, model_name, f"현재 시점 {date.today().year}년. '{sector_choice}' 분야 10배 성장 유망 중소형주 3개 요약.")
+                    st.session_state["ai_recommend_cache"][sector_choice] = res
                 except Exception as e: 
                     st.error(f"오류 발생: {e}")
+
+    # 기존 생성된 추천 내역이 있으면 유지하여 출력
+    if sector_choice in st.session_state["ai_recommend_cache"]:
+        st.markdown(st.session_state["ai_recommend_cache"][sector_choice])
 
 # ========================================================
 # TAB 5: 일지
