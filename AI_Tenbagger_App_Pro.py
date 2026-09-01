@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (타이틀 테두리 가림 원천 차단)
+# [3] 디자인 시스템 (타이틀 배너 완벽 노출 및 레이아웃 정리)
 # =========================================================
 st.markdown("""
 <style>
@@ -67,7 +67,7 @@ st.markdown("""
     --radius: 8px;
 }
 
-/* 💡 스트림릿 상단 기본 헤더 요소 완전 비활성화 (배너 하단 잘림 해결) */
+/* 스트림릿 기본 헤더 비활성화 */
 [data-testid="stHeader"], header, .stAppHeader {
     display: none !important;
     height: 0px !important;
@@ -80,27 +80,26 @@ html, body, .stApp, [data-testid="stSidebar"] {
 }
 h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
-/* 💡 타이틀 배너 (상하 테두리가 잘리지 않는 안정적 높이 및 패딩) */
+/* 타이틀 배너 (독립적 높이와 안전 여백 확보) */
 .title-banner {
     background: linear-gradient(135deg, #1E293B 0%, #1D4ED8 50%, #3B82F6 100%);
     color: #ffffff;
     text-align: center;
     font-weight: 800;
-    font-size: clamp(1.2rem, 5vw, 1.6rem);
-    padding: 12px 8px !important;
+    font-size: clamp(1.1rem, 4.8vw, 1.5rem);
+    padding: 10px 6px !important;
     border-radius: 12px;
-    margin: 10px 0 12px 0 !important;
+    margin: 15px 0 10px 0 !important;
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     letter-spacing: -0.5px;
     width: 100%;
     border: 1.5px solid #38BDF8;
     line-height: 1.2 !important;
-    display: block;
     box-sizing: border-box;
 }
 
 .block-container {
-    padding-top: 1rem !important; 
+    padding-top: 0.8rem !important; 
     padding-bottom: 0.5rem !important;
     padding-left: 0.6rem !important;
     padding-right: 0.6rem !important;
@@ -187,7 +186,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & AI 호출 (최신 gemini-2.5-flash 지원)
+# [5] 데이터 로딩 & AI 호출 (gemini-3.6-flash 대응)
 # =========================================================
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -216,8 +215,8 @@ def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
 @st.cache_data(ttl=21600, show_spinner=False)
 def cached_ai_text(api_key: str, model_name: str, prompt: str) -> str:
     client = genai.Client(api_key=api_key)
-    # 💡 404 및 권장 모델 명시 대응: gemini-2.5-flash 표준 사용
-    target_models = ["gemini-2.5-flash", "gemini-2.0-flash", model_name]
+    # 에러 메시지에서 제시된 gemini-3.6-flash 및 최신 플래시 모델 순차 호출
+    target_models = ["gemini-3.6-flash", model_name, "gemini-2.5-flash"]
     
     last_err = None
     for m in target_models:
@@ -246,7 +245,7 @@ def render_mini_grid(cards: list):
 with st.sidebar:
     st.markdown("### ⚙️ 시스템 설정")
     api_key_input = st.text_input("Gemini API Key", type="password")
-    model_name = st.text_input("Gemini 모델명", value="gemini-2.5-flash")
+    model_name = st.text_input("Gemini 모델명", value="gemini-3.6-flash")
 
 # =========================================================
 # [7] 메인 타이틀 배너 & 종목 선택
