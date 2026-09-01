@@ -109,15 +109,34 @@ h1 + div { color: var(--text-muted) !important; font-size: 0.9rem; }
     border: 1px solid var(--border); margin-top: 8px; margin-right: 6px;
 }
 
-/* 보조 지표 카드는 히어로보다 낮은 위계 - 얇은 테두리만 */
+/* 보조 지표 카드 (커스텀 그리드 - st.columns는 모바일에서 세로로 쌓이며
+   카드가 과도하게 커지는 문제가 있어 순수 CSS 그리드로 대체) */
+.mini-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 10px;
+    margin: 2px 0 16px 0;
+}
+.mini-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+}
+.mini-label { color: var(--text-muted); font-size: 0.76rem; margin-bottom: 4px; }
+.mini-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.25rem; color: var(--text); }
+.mini-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; margin-top: 3px; font-weight: 600; }
+
+/* st.metric은 이제 일지 탭 요약 정도에만 쓰이므로 카드형은 유지하되 크기를 축소 */
 [data-testid="stMetric"] {
     background-color: var(--surface) !important;
     border: 1px solid var(--border) !important;
     border-radius: var(--radius) !important;
-    padding: 12px 14px !important;
+    padding: 10px 12px !important;
 }
-[data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-weight: 700 !important; }
-[data-testid="stMetricLabel"] { color: var(--text-muted) !important; font-size: 0.8rem !important; }
+[data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-weight: 700 !important; font-size: 1.25rem !important; }
+[data-testid="stMetricLabel"] { color: var(--text-muted) !important; font-size: 0.78rem !important; }
+[data-testid="stMetricDelta"] svg { display: none !important; } /* 방향성 없는 텍스트(중립/과매수 등)에 화살표가 붙는 것 방지 */
 
 [data-testid="stExpander"] {
     background-color: var(--surface) !important;
@@ -148,14 +167,27 @@ h1 + div { color: var(--text-muted) !important; font-size: 0.9rem; }
 }
 button[kind="primary"] { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%) !important; }
 
-.stTabs [data-baseweb="tab-list"] {
+/* 탭: baseweb 클래스명이 버전마다 달라질 수 있어 role 기반 선택자를 함께 사용 */
+.stTabs [data-baseweb="tab-list"], [data-testid="stTabs"] [role="tablist"] {
     background-color: var(--surface) !important;
     border: 1px solid var(--border) !important;
     border-radius: 10px !important;
     padding: 4px !important; gap: 4px !important;
 }
-.stTabs [data-baseweb="tab"] { color: var(--text-muted) !important; border-radius: 6px !important; }
-.stTabs [aria-selected="true"] { background-color: var(--surface-2) !important; color: var(--accent) !important; }
+.stTabs [data-baseweb="tab"], [data-testid="stTabs"] button[role="tab"] {
+    color: var(--text-muted) !important;
+    border-radius: 6px !important;
+    font-weight: 500 !important;
+}
+.stTabs [aria-selected="true"], [data-testid="stTabs"] button[aria-selected="true"] {
+    background-color: var(--surface-2) !important;
+    color: var(--accent) !important;
+}
+[data-testid="stTabs"] [data-baseweb="tab-highlight"] { background-color: transparent !important; }
+
+/* 전반적인 여백 축소 (모바일에서 카드 사이 공백이 과도했던 문제) */
+.block-container { padding-top: 1.4rem !important; padding-bottom: 2rem !important; }
+[data-testid="stVerticalBlock"] { gap: 0.55rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -223,6 +255,23 @@ def cached_ai_text(api_key: str, model_name: str, prompt: str) -> str:
 
 def get_active_gemini_key(sidebar_key: str) -> str:
     return sidebar_key or os.environ.get("GEMINI_API_KEY", "")
+
+
+def render_mini_grid(cards: list):
+    """카드 리스트를 st.columns 없이 순수 CSS 그리드로 렌더링 (모바일에서도 무너지지 않음)."""
+    items_html = ""
+    for c in cards:
+        tag_html = ""
+        if c.get("tag"):
+            tag_color = c.get("tag_color", "var(--text-muted)")
+            tag_html = f'<div class="mini-tag" style="color:{tag_color};">{c["tag"]}</div>'
+        items_html += f"""
+        <div class="mini-card">
+            <div class="mini-label">{c['label']}</div>
+            <div class="mini-value">{c['value']}</div>
+            {tag_html}
+        </div>"""
+    st.markdown(f'<div class="mini-grid">{items_html}</div>', unsafe_allow_html=True)
 
 
 # =========================================================
@@ -331,10 +380,12 @@ with tab1:
 
         rsi_val = data["RSI"].iloc[-1]
         rsi_state = "과매수" if rsi_val >= 70 else ("과매도" if rsi_val <= 30 else "중립")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("RSI (14)", f"{rsi_val:.0f}", rsi_state)
-        c2.metric("최대 낙폭 (MDD)", f"{max_drawdown:.1f}%")
-        c3.metric("52주 최고가", f"${data['Close'].tail(252).max():,.2f}")
+        rsi_tag_color = "var(--down)" if rsi_state == "과매수" else ("var(--up)" if rsi_state == "과매도" else "var(--text-muted)")
+        render_mini_grid([
+            {"label": "RSI (14)", "value": f"{rsi_val:.0f}", "tag": rsi_state, "tag_color": rsi_tag_color},
+            {"label": "최대 낙폭 (MDD)", "value": f"{max_drawdown:.1f}%"},
+            {"label": "52주 최고가", "value": f"${data['Close'].tail(252).max():,.2f}"},
+        ])
 
         st.write("")
         years = st.slider("미래 예측 기간 (년)", 1, 5, 2)
@@ -540,10 +591,11 @@ with tab5:
 
         buys = view_df[view_df["Action"] == "매수"]
         sells = view_df[view_df["Action"] == "매도"]
-        m1, m2, m3 = st.columns(3)
-        m1.metric("매수 기록", len(buys))
-        m2.metric("매도 기록", len(sells))
-        m3.metric("평균 매수가", f"${buys['Price'].mean():,.2f}" if len(buys) else "—")
+        render_mini_grid([
+            {"label": "매수 기록", "value": str(len(buys))},
+            {"label": "매도 기록", "value": str(len(sells))},
+            {"label": "평균 매수가", "value": f"${buys['Price'].mean():,.2f}" if len(buys) else "—"},
+        ])
 
         # 티커 선택지에는 관심 종목 + 일지에 이미 남아있는 과거 종목을 모두 포함
         ticker_options = sorted(set(st.session_state["watchlist"]) | set(df_journal["Ticker"].dropna().unique().tolist()))
