@@ -46,7 +46,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (타이틀 배너화 & 극한의 원스크린 여백 압축)
+# [3] 디자인 시스템 (타이틀 배너 잘림 현상 완벽 해결)
 # =========================================================
 st.markdown("""
 <style>
@@ -73,7 +73,7 @@ html, body, .stApp, [data-testid="stSidebar"], [data-testid="stHeader"] {
 }
 h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
-/* 💡 [핵심] 타이틀을 꽉 찬 이미지 배너처럼 디자인 */
+/* 💡 타이틀 배너 - 상단 겹침 해결을 위해 마진 리셋 */
 .title-banner {
     background: linear-gradient(135deg, #1E293B 0%, #1D4ED8 50%, #3B82F6 100%);
     color: #ffffff;
@@ -82,7 +82,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     font-size: clamp(1.4rem, 6vw, 1.8rem);
     padding: 12px 10px;
     border-radius: 12px;
-    margin-top: -10px;
+    margin-top: 0px !important; /* 상단 겹침 원인 제거 */
     margin-bottom: 8px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     letter-spacing: -0.5px;
@@ -90,9 +90,9 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     border: 1px solid #38BDF8;
 }
 
-/* 💡 요소 간 수직 간격을 극한으로 압축 */
+/* 💡 페이지 전체 상단 여백 확보 (4rem)로 상단바 가림 방지 */
 .block-container {
-    padding-top: 2.8rem !important; /* 상단바 가리지 않는 최소 한계치 */
+    padding-top: 4rem !important; 
     padding-bottom: 0.5rem !important;
     padding-left: 0.6rem !important;
     padding-right: 0.6rem !important;
@@ -238,7 +238,6 @@ with st.sidebar:
 # =========================================================
 # [7] 메인 화면 타이틀 배너 및 종목 선택
 # =========================================================
-# 💡 밋밋한 텍스트 대신 꽉 찬 배너 디자인 적용
 st.markdown('<div class="title-banner">📈 AI 텐배거 발굴기 Pro</div>', unsafe_allow_html=True)
 
 selected_index = st.session_state["watchlist"].index(st.session_state["current_ticker"]) if st.session_state["current_ticker"] in st.session_state["watchlist"] else 0
@@ -266,7 +265,7 @@ with st.spinner("데이터 로딩 중..."):
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 차트", "🧠 리포트", "🎯 목표", "🌟 추천", "📝 일지"])
 
 # ========================================================
-# TAB 1: 📈 차트 & 기술적 분석 (원스크린 최적화)
+# TAB 1: 📈 차트 & 기술적 분석
 # ========================================================
 with tab1:
     if data.empty:
@@ -303,7 +302,6 @@ with tab1:
         with st.spinner("예측 중..."):
             forecast = run_forecast(df_train, years)
 
-        # 💡 차트 높이를 240px로 꽉 줄여서 모바일 한 화면에 들어오도록 설정
         fig_chart = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.75, 0.25], vertical_spacing=0.03)
         fig_chart.add_trace(go.Scatter(x=df_train["ds"], y=df_train["y"], mode="markers", marker=dict(color="#64748B", size=2)), row=1, col=1)
         fig_chart.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], mode="lines", line=dict(color="#F43F5E", width=2)), row=1, col=1)
@@ -313,7 +311,7 @@ with tab1:
 
         fig_chart.update_layout(
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=0, r=0, t=5, b=5), showlegend=False, height=240, # 차트 높이 극한 압축
+            margin=dict(l=0, r=0, t=5, b=5), showlegend=False, height=240, 
         )
         fig_chart.update_xaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4", size=9))
         fig_chart.update_yaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4", size=9))
