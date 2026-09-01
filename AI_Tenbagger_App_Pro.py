@@ -18,8 +18,6 @@ st.set_page_config(page_title="AI 텐배거 프로", layout="centered", page_ico
 
 # =========================================================
 # [2] 앱 자체 테마 설정 파일 자동 생성
-#     - 배포 환경에 따라 디스크가 read-only일 수 있으므로 예외 처리
-#     - 무한 rerun을 막기 위해 세션 플래그로 1회만 시도
 # =========================================================
 def ensure_theme_config():
     if st.session_state.get("_theme_checked"):
@@ -43,16 +41,12 @@ def ensure_theme_config():
                 f.write(theme_config)
             st.rerun()
     except OSError:
-        pass  # 읽기 전용 배포 환경 등에서는 조용히 넘어가고 CSS로만 테마 적용
+        pass
 
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템: 색상 토큰 + 타이포그래피
-#     - 라벨/본문: Inter (가독성 좋은 UI 서체)
-#     - 숫자(가격·퍼센트·지표): JetBrains Mono → 데이터 값이라는 것을 시각적으로 구분
-#     - 상승/하락은 초록/빨강으로 의미 고정, 인터랙션 요소(버튼)는 블루 계열로 분리
-#       (기존 코드는 "주요 액션 버튼"과 "손실"에 같은 rose 컬러를 써서 의미가 충돌했음)
+# [3] 디자인 시스템 (상단바 겹침 방지 여백 수정 완료)
 # =========================================================
 st.markdown("""
 <style>
@@ -84,14 +78,12 @@ h1 {
     font-size: clamp(1.3rem, 5vw, 1.85rem) !important;
     line-height: 1.3 !important;
     margin-bottom: 0.1rem !important;
-    /* 구글 폰트(외부 네트워크) 로딩이 막히는 환경이 있어, 제목만큼은 기기에
-       이미 설치된 한글 시스템 폰트를 직접 지정해 항상 정상 표시되도록 함 */
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
                  "Malgun Gothic", "맑은 고딕", Roboto, sans-serif !important;
+    color: var(--text) !important;
 }
 h1 + div { color: var(--text-muted) !important; font-size: 0.9rem; }
 
-/* 히어로 가격 블록: 유일하게 "굵게" 강조하는 요소 (강조는 한 곳에만) */
 .hero-price {
     padding: 6px 0 14px 0;
     border-bottom: 1px solid var(--border);
@@ -112,8 +104,6 @@ h1 + div { color: var(--text-muted) !important; font-size: 0.9rem; }
     border: 1px solid var(--border); margin-top: 8px; margin-right: 6px;
 }
 
-/* 보조 지표 카드 (커스텀 그리드 - st.columns는 모바일에서 세로로 쌓이며
-   카드가 과도하게 커지는 문제가 있어 순수 CSS 그리드로 대체) */
 .mini-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
@@ -130,7 +120,6 @@ h1 + div { color: var(--text-muted) !important; font-size: 0.9rem; }
 .mini-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.25rem; color: var(--text); }
 .mini-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; margin-top: 3px; font-weight: 600; }
 
-/* st.metric은 이제 일지 탭 요약 정도에만 쓰이므로 카드형은 유지하되 크기를 축소 */
 [data-testid="stMetric"] {
     background-color: var(--surface) !important;
     border: 1px solid var(--border) !important;
@@ -139,7 +128,7 @@ h1 + div { color: var(--text-muted) !important; font-size: 0.9rem; }
 }
 [data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-weight: 700 !important; font-size: 1.25rem !important; }
 [data-testid="stMetricLabel"] { color: var(--text-muted) !important; font-size: 0.78rem !important; }
-[data-testid="stMetricDelta"] svg { display: none !important; } /* 방향성 없는 텍스트(중립/과매수 등)에 화살표가 붙는 것 방지 */
+[data-testid="stMetricDelta"] svg { display: none !important; }
 
 [data-testid="stExpander"] {
     background-color: var(--surface) !important;
@@ -159,7 +148,6 @@ h1 + div { color: var(--text-muted) !important; font-size: 0.9rem; }
 [data-baseweb="menu"], [data-baseweb="popover"] { background-color: var(--surface) !important; border: 1px solid var(--border) !important; }
 [data-baseweb="menu"] li:hover { background-color: var(--surface-2) !important; }
 
-/* 인터랙션(버튼)은 항상 블루 계열 → "위험/손실"과 색이 겹치지 않게 분리 */
 .stButton>button {
     background: var(--accent-strong) !important;
     color: white !important;
@@ -170,7 +158,6 @@ h1 + div { color: var(--text-muted) !important; font-size: 0.9rem; }
 }
 button[kind="primary"] { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%) !important; }
 
-/* 탭: baseweb 클래스명이 버전마다 달라질 수 있어 role 기반 선택자를 함께 사용 */
 .stTabs [data-baseweb="tab-list"], [data-testid="stTabs"] [role="tablist"] {
     background-color: var(--surface) !important;
     border: 1px solid var(--border) !important;
@@ -188,9 +175,9 @@ button[kind="primary"] { background: linear-gradient(135deg, var(--accent) 0%, v
 }
 [data-testid="stTabs"] [data-baseweb="tab-highlight"] { background-color: transparent !important; }
 
-/* 전반적인 여백 축소 (모바일에서 카드 사이 공백이 과도했던 문제 + 스크롤 최소화) */
+/* 💡 상단바에 타이틀이 가리지 않도록 padding-top 확보 */
 .block-container {
-    padding-top: 0.6rem !important;
+    padding-top: 3.2rem !important;
     padding-bottom: 1rem !important;
     padding-left: 1rem !important;
     padding-right: 1rem !important;
@@ -198,16 +185,14 @@ button[kind="primary"] { background: linear-gradient(135deg, var(--accent) 0%, v
 }
 [data-testid="stVerticalBlock"] { gap: 0.25rem !important; }
 [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
-h1 { margin-top: 0 !important; }
 .hero-price { padding: 2px 0 8px 0 !important; margin-bottom: 8px !important; }
 .mini-grid { margin: 2px 0 6px 0 !important; }
 [data-testid="stSliderTickBar"] { margin-bottom: 0 !important; }
 [data-baseweb="select"] > div { min-height: 2.4rem !important; }
 .stTabs { margin-bottom: 0 !important; }
 
-/* 화면 크기별 자동 조정: 작은 화면일수록 여백/글자 크기를 한 단계씩 더 줄임 */
 @media (max-width: 480px) {
-    .block-container { padding-left: 0.6rem !important; padding-right: 0.6rem !important; padding-top: 0.4rem !important; }
+    .block-container { padding-left: 0.6rem !important; padding-right: 0.6rem !important; padding-top: 3.0rem !important; }
     h1 { font-size: clamp(1.15rem, 4.5vw, 1.5rem) !important; }
     .hero-label { font-size: 0.78rem !important; margin-bottom: 0 !important; }
     .hero-value { font-size: clamp(1.5rem, 8vw, 1.9rem) !important; }
@@ -232,7 +217,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 (캐시 + 예외 처리 + 최신 yfinance 스키마 대응)
+# [5] 데이터 로딩
 # =========================================================
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -247,7 +232,6 @@ def load_price_data(t: str) -> pd.DataFrame:
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def is_valid_ticker(t: str) -> bool:
-    """관심 종목 추가 전 실제 존재하는 티커인지 가볍게 검증"""
     try:
         hist = yf.Ticker(t).history(period="5d")
         return not hist.empty
@@ -281,16 +265,10 @@ def cached_ai_text(api_key: str, model_name: str, prompt: str) -> str:
     response = client.models.generate_content(model=model_name, contents=prompt)
     return response.text
 
-
 def get_active_gemini_key(sidebar_key: str) -> str:
     return sidebar_key or os.environ.get("GEMINI_API_KEY", "")
 
-
 def render_mini_grid(cards: list):
-    """카드 리스트를 st.columns 없이 순수 CSS 그리드로 렌더링 (모바일에서도 무너지지 않음).
-    주의: 각 카드 HTML은 빈 줄(공백만 있는 줄)이 생기지 않도록 한 줄로 이어붙인다.
-    (마크다운 렌더러가 HTML 블록 중간의 빈 줄을 블록 종료로 해석해 이후 태그를
-    그대로 텍스트로 노출시키는 문제가 있었음)"""
     parts = []
     for c in cards:
         tag_html = ""
@@ -303,16 +281,15 @@ def render_mini_grid(cards: list):
         )
     st.markdown(f'<div class="mini-grid">{"".join(parts)}</div>', unsafe_allow_html=True)
 
-
 # =========================================================
-# [6] 사이드바: 시스템 설정 (API 키/모델)
+# [6] 사이드바
 # =========================================================
 with st.sidebar:
     st.markdown("### ⚙️ 시스템 설정")
     api_key_input = st.text_input("Gemini API Key", type="password")
     model_name = st.text_input(
         "Gemini 모델명", value="gemini-flash-latest",
-        help="Google이 모델명을 자주 교체하므로, 오류가 나면 최신 모델명(예: gemini-2.5-flash)으로 바꿔보세요."
+        help="Google이 모델명을 자주 교체하므로, 오류가 나면 최신 모델명으로 바꿔보세요."
     )
 
 # =========================================================
@@ -327,7 +304,6 @@ selected_index = (
 ticker = st.selectbox("🔍 분석 대상 종목", st.session_state["watchlist"], index=selected_index)
 st.session_state["current_ticker"] = ticker
 
-# 종목 추가/삭제는 사이드바에 숨기지 않고 여기서 바로 처리 (모바일에서는 사이드바가 잘 안 보임)
 with st.expander("➕ 종목 추가 / 삭제"):
     new_ticker = st.text_input("새 종목 코드 추가", placeholder="예: NVDA")
     if st.button("종목 추가", use_container_width=True):
@@ -354,7 +330,6 @@ with st.expander("➕ 종목 추가 / 삭제"):
     if not can_delete:
         st.caption("⚠️ 최소 1개 종목은 유지되어야 합니다.")
 
-
 with st.spinner(f"{ticker} 데이터 불러오는 중..."):
     data = load_price_data(ticker)
 
@@ -380,7 +355,6 @@ with tab1:
         delta_color = "var(--up)" if delta >= 0 else "var(--down)"
         arrow = "▲" if delta >= 0 else "▼"
 
-        # 정배열/역배열(골든/데드 크로스 상태) 판정
         cross_badge = ""
         if pd.notna(data["MA50"].iloc[-1]) and pd.notna(data["MA200"].iloc[-1]):
             ma50, ma200 = data["MA50"].iloc[-1], data["MA200"].iloc[-1]
@@ -498,7 +472,6 @@ with tab2:
                     st.markdown(cached_ai_text(active_key, model_name, prompt))
                 except Exception as e:
                     st.error(f"오류 발생: {e}")
-                    st.caption("모델명이 잘못되었거나 API 키가 유효하지 않을 수 있습니다. 사이드바의 모델명을 확인해 보세요.")
 
     with st.expander("💼 기관 투자자 보유 현황 (Smart Money)"):
         holders = load_institutional_holders(ticker)
@@ -518,8 +491,7 @@ with tab3:
         target_golf = st.number_input("정기 골프 펀드 ($)", value=100000, min_value=0)
         target_living = st.number_input("생활 자금 ($)", value=600000, min_value=0)
         current_asset = st.number_input("현재 투자 원금 ($)", value=10000, min_value=0)
-        annual_return_pct = st.slider("가정 연평균 수익률 (%)", 5, 100, 30,
-                                       help="1000배 고정 대신 직접 목표 수익률을 조정할 수 있습니다.")
+        annual_return_pct = st.slider("가정 연평균 수익률 (%)", 5, 100, 30)
 
     total_target = target_farm + target_golf + target_living
     progress = min((current_asset / total_target) * 100, 100.0) if total_target > 0 else 0
@@ -625,7 +597,6 @@ with tab5:
             {"label": "평균 매수가", "value": f"${buys['Price'].mean():,.2f}" if len(buys) else "—"},
         ])
 
-        # 티커 선택지에는 관심 종목 + 일지에 이미 남아있는 과거 종목을 모두 포함
         ticker_options = sorted(set(st.session_state["watchlist"]) | set(df_journal["Ticker"].dropna().unique().tolist()))
 
         st.markdown("### 📋 일지 기록 (내용 수정)")
@@ -633,7 +604,7 @@ with tab5:
 
         edited_df = st.data_editor(
             view_df,
-            num_rows="fixed",  # 행 추가/삭제는 아래 전용 UI로 처리 (표 안 삭제는 잘 안 먹는 경우가 많아 분리함)
+            num_rows="fixed",
             use_container_width=True,
             hide_index=True,
             key="journal_editor",
@@ -649,7 +620,6 @@ with tab5:
 
         if st.button("💾 변경된 일지 저장하기", use_container_width=True):
             if current_only:
-                # 필터링된 뷰만 편집했을 경우, 다른 종목 기록은 그대로 두고 병합
                 other_rows = df_journal[df_journal["Ticker"] != ticker]
                 final_df = pd.concat([other_rows, edited_df], ignore_index=True)
             else:
