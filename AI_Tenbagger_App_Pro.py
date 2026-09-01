@@ -80,10 +80,9 @@ html, body, .stApp, [data-testid="stSidebar"], [data-testid="stHeader"] {
 h1, h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
 h1 {
-    font-weight: 800 !important;
-    letter-spacing: -0.5px;
-    font-size: clamp(1.3rem, 5vw, 1.9rem) !important;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-weight: 700 !important;
+    font-size: clamp(1.3rem, 5vw, 1.85rem) !important;
+    line-height: 1.3 !important;
     margin-bottom: 0.1rem !important;
 }
 h1 + div { color: var(--text-muted) !important; font-size: 0.9rem; }
@@ -258,20 +257,21 @@ def get_active_gemini_key(sidebar_key: str) -> str:
 
 
 def render_mini_grid(cards: list):
-    """카드 리스트를 st.columns 없이 순수 CSS 그리드로 렌더링 (모바일에서도 무너지지 않음)."""
-    items_html = ""
+    """카드 리스트를 st.columns 없이 순수 CSS 그리드로 렌더링 (모바일에서도 무너지지 않음).
+    주의: 각 카드 HTML은 빈 줄(공백만 있는 줄)이 생기지 않도록 한 줄로 이어붙인다.
+    (마크다운 렌더러가 HTML 블록 중간의 빈 줄을 블록 종료로 해석해 이후 태그를
+    그대로 텍스트로 노출시키는 문제가 있었음)"""
+    parts = []
     for c in cards:
         tag_html = ""
         if c.get("tag"):
             tag_color = c.get("tag_color", "var(--text-muted)")
             tag_html = f'<div class="mini-tag" style="color:{tag_color};">{c["tag"]}</div>'
-        items_html += f"""
-        <div class="mini-card">
-            <div class="mini-label">{c['label']}</div>
-            <div class="mini-value">{c['value']}</div>
-            {tag_html}
-        </div>"""
-    st.markdown(f'<div class="mini-grid">{items_html}</div>', unsafe_allow_html=True)
+        parts.append(
+            f'<div class="mini-card"><div class="mini-label">{c["label"]}</div>'
+            f'<div class="mini-value">{c["value"]}</div>{tag_html}</div>'
+        )
+    st.markdown(f'<div class="mini-grid">{"".join(parts)}</div>', unsafe_allow_html=True)
 
 
 # =========================================================
@@ -369,14 +369,13 @@ with tab1:
             else:
                 cross_badge = '<span class="badge" style="color:var(--down); border-color:var(--down);">역배열 (MA50 &lt; MA200)</span>'
 
-        st.markdown(f"""
-        <div class="hero-price">
-            <div class="hero-label">{ticker} 현재가</div>
-            <div class="hero-value">${current_price:,.2f}</div>
-            <div class="hero-delta" style="color:{delta_color};">{arrow} {abs(delta):,.2f} ({abs(delta_pct):.2f}%)</div>
-            {cross_badge}
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="hero-price"><div class="hero-label">{ticker} 현재가</div>'
+            f'<div class="hero-value">${current_price:,.2f}</div>'
+            f'<div class="hero-delta" style="color:{delta_color};">{arrow} {abs(delta):,.2f} ({abs(delta_pct):.2f}%)</div>'
+            f'{cross_badge}</div>',
+            unsafe_allow_html=True,
+        )
 
         rsi_val = data["RSI"].iloc[-1]
         rsi_state = "과매수" if rsi_val >= 70 else ("과매도" if rsi_val <= 30 else "중립")
