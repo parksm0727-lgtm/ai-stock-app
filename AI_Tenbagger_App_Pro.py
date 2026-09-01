@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (폭 채움 배너 & 상단바 여백 최적화)
+# [3] 디자인 시스템 (폭 채움 배너, 탭 균등 배치 CSS)
 # =========================================================
 st.markdown("""
 <style>
@@ -74,7 +74,7 @@ html, body, .stApp, [data-testid="stSidebar"], [data-testid="stHeader"] {
 }
 h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
-/* 💡 상단바 가림 방지 여백 */
+/* 상단바 가림 방지 여백 */
 .block-container {
     padding-top: 3.5rem !important;
     padding-bottom: 0.5rem !important;
@@ -85,7 +85,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 [data-testid="stVerticalBlock"] { gap: 0.1rem !important; }
 [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
 
-/* 💡 폭 방향으로 꽉 차는 타이틀 배너 */
+/* 폭 방향으로 꽉 차는 타이틀 배너 */
 .title-banner {
     background: linear-gradient(135deg, #1E293B 0%, #1D4ED8 50%, #3B82F6 100%);
     color: #ffffff;
@@ -134,18 +134,25 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 .mini-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1rem; color: var(--text); white-space: nowrap; }
 .mini-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; margin-top: 2px; font-weight: 600; }
 
+/* 💡 탭 메뉴 양쪽 균등 배치 (Flexbox) */
 .stTabs [data-baseweb="tab-list"], [data-testid="stTabs"] [role="tablist"] {
     background-color: var(--surface) !important;
     border: 1px solid var(--border) !important;
     border-radius: 8px !important;
-    padding: 2px !important; gap: 2px !important;
+    padding: 2px !important;
+    gap: 2px !important;
+    display: flex !important;
+    width: 100% !important;
 }
 .stTabs [data-baseweb="tab"], [data-testid="stTabs"] button[role="tab"] {
+    flex: 1 1 0% !important; /* 각 탭을 동일한 너비로 강제 확장 */
+    text-align: center !important;
+    justify-content: center !important;
     color: var(--text-muted) !important;
     border-radius: 6px !important;
     font-weight: 600 !important;
     font-size: 0.8rem !important;
-    padding: 4px 8px !important;
+    padding: 6px 0px !important;
 }
 .stTabs [aria-selected="true"], [data-testid="stTabs"] button[aria-selected="true"] {
     background-color: var(--surface-2) !important;
@@ -170,40 +177,40 @@ button[kind="primary"] { background: linear-gradient(135deg, var(--accent) 0%, v
 """, unsafe_allow_html=True)
 
 # =========================================================
-# [4] 데이터 및 상태 초기화
+# [4] 파일 기반 영구 저장소 (관심 종목, AI 리포트, AI 추천)
 # =========================================================
 WATCHLIST_FILE = "watchlist.json"
+REPORT_FILE = "ai_reports.json"
+RECOMMEND_FILE = "ai_recommends.json"
 DEFAULT_WATCHLIST = ["ASTS", "OKLO", "IONQ", "RXRX", "PLTR", "TSLA"]
 
-def load_saved_watchlist():
-    if os.path.exists(WATCHLIST_FILE):
+def load_json_file(filename, default_val):
+    if os.path.exists(filename):
         try:
-            with open(WATCHLIST_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, list) and len(data) > 0:
-                    return data
+            with open(filename, "r", encoding="utf-8") as f:
+                return json.load(f)
         except Exception:
             pass
-    return DEFAULT_WATCHLIST.copy()
+    return default_val
 
-def save_watchlist(watchlist):
+def save_json_file(filename, data):
     try:
-        with open(WATCHLIST_FILE, "w", encoding="utf-8") as f:
-            json.dump(watchlist, f, ensure_ascii=False, indent=2)
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
         st.error(f"저장 실패: {e}")
 
 if "watchlist" not in st.session_state:
-    st.session_state["watchlist"] = load_saved_watchlist()
+    st.session_state["watchlist"] = load_json_file(WATCHLIST_FILE, DEFAULT_WATCHLIST.copy())
 
 if "current_ticker" not in st.session_state or st.session_state["current_ticker"] not in st.session_state["watchlist"]:
     st.session_state["current_ticker"] = st.session_state["watchlist"][0]
 
-# AI 생성 데이터 상태 유지
+# 영구 파일 로딩
 if "ai_report_cache" not in st.session_state:
-    st.session_state["ai_report_cache"] = {}
+    st.session_state["ai_report_cache"] = load_json_file(REPORT_FILE, {})
 if "ai_recommend_cache" not in st.session_state:
-    st.session_state["ai_recommend_cache"] = {}
+    st.session_state["ai_recommend_cache"] = load_json_file(RECOMMEND_FILE, {})
 
 JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
@@ -287,7 +294,7 @@ with st.expander("➕ 종목 관리"):
         if t and is_valid_ticker(t) and t not in st.session_state["watchlist"]:
             st.session_state["watchlist"].append(t)
             st.session_state["current_ticker"] = t
-            save_watchlist(st.session_state["watchlist"])
+            save_json_file(WATCHLIST_FILE, st.session_state["watchlist"])
             st.rerun()
 
     del_ticker = st.selectbox("삭제할 종목 선택", st.session_state["watchlist"], key="del_ticker_main", label_visibility="collapsed")
@@ -295,7 +302,7 @@ with st.expander("➕ 종목 관리"):
         st.session_state["watchlist"].remove(del_ticker)
         if st.session_state["current_ticker"] == del_ticker: 
             st.session_state["current_ticker"] = st.session_state["watchlist"][0]
-        save_watchlist(st.session_state["watchlist"])
+        save_json_file(WATCHLIST_FILE, st.session_state["watchlist"])
         st.rerun()
 
 with st.spinner("최신 주가 데이터 로딩 중..."):
@@ -351,7 +358,7 @@ with tab1:
         st.plotly_chart(fig_chart, use_container_width=True)
 
 # ========================================================
-# TAB 2: AI 리포트 (생성 결과 유지를 위한 세션 스토리지)
+# TAB 2: AI 리포트 (생성 일자 표기 및 파일 영구 저장)
 # ========================================================
 with tab2:
     active_key = get_active_gemini_key(api_key_input)
@@ -365,14 +372,22 @@ with tab2:
                 news_text = "\n".join(news_items) if news_items else "최신 뉴스가 없습니다."
                 prompt = f"현재 {date.today().year}년 기준. 종목 '{ticker}' 관련 뉴스:\n{news_text}\n핵심 단기 촉매와 리스크 요약."
                 try: 
-                    res = get_ai_text(active_key, model_name, prompt)
-                    st.session_state["ai_report_cache"][ticker] = res
+                    res_text = get_ai_text(active_key, model_name, prompt)
+                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    # 영구 파일 저장용 객체 구성
+                    st.session_state["ai_report_cache"][ticker] = {
+                        "created_at": now_str,
+                        "content": res_text
+                    }
+                    save_json_file(REPORT_FILE, st.session_state["ai_report_cache"])
                 except Exception as e: 
                     st.error(f"오류 발생: {e}")
 
-    # 기존 생성된 리포트가 있으면 유지하여 출력
+    # 기존 저장된 데이터 상시 출력
     if ticker in st.session_state["ai_report_cache"]:
-        st.markdown(st.session_state["ai_report_cache"][ticker])
+        item = st.session_state["ai_report_cache"][ticker]
+        st.caption(f"📅 **생성 일시:** `{item['created_at']}`")
+        st.markdown(item["content"])
 
 # ========================================================
 # TAB 3: 목표
@@ -398,7 +413,7 @@ with tab3:
     st.plotly_chart(fig_sim, use_container_width=True)
 
 # ========================================================
-# TAB 4: 추천 (생성 결과 유지를 위한 세션 스토리지)
+# TAB 4: 추천 (생성 일자 표기 및 파일 영구 저장)
 # ========================================================
 with tab4:
     sector_choice = st.selectbox("분야 선택", ["우주 항공 및 통신", "AI 바이오 헬스케어", "차세대 에너지 (SMR)", "양자 컴퓨팅"])
@@ -409,14 +424,22 @@ with tab4:
         else:
             with st.spinner("분석 중..."):
                 try: 
-                    res = get_ai_text(active_key, model_name, f"현재 시점 {date.today().year}년. '{sector_choice}' 분야 10배 성장 유망 중소형주 3개 요약.")
-                    st.session_state["ai_recommend_cache"][sector_choice] = res
+                    res_text = get_ai_text(active_key, model_name, f"현재 시점 {date.today().year}년. '{sector_choice}' 분야 10배 성장 유망 중소형주 3개 요약.")
+                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    # 영구 파일 저장용 객체 구성
+                    st.session_state["ai_recommend_cache"][sector_choice] = {
+                        "created_at": now_str,
+                        "content": res_text
+                    }
+                    save_json_file(RECOMMEND_FILE, st.session_state["ai_recommend_cache"])
                 except Exception as e: 
                     st.error(f"오류 발생: {e}")
 
-    # 기존 생성된 추천 내역이 있으면 유지하여 출력
+    # 기존 저장된 데이터 상시 출력
     if sector_choice in st.session_state["ai_recommend_cache"]:
-        st.markdown(st.session_state["ai_recommend_cache"][sector_choice])
+        item = st.session_state["ai_recommend_cache"][sector_choice]
+        st.caption(f"📅 **생성 일시:** `{item['created_at']}`")
+        st.markdown(item["content"])
 
 # ========================================================
 # TAB 5: 일지
