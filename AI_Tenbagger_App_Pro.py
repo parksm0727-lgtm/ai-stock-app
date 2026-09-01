@@ -134,7 +134,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 .mini-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1rem; color: var(--text); white-space: nowrap; }
 .mini-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; margin-top: 2px; font-weight: 600; }
 
-/* 💡 [핵심] 최신 Streamlit 전용 탭 5개 가로 1:1:1:1:1 강제 분할 CSS */
+/* 탭 5개 가로 1:1:1:1:1 강제 분할 CSS */
 .stTabs [data-baseweb="tab-list"] {
     display: flex !important;
     width: 100% !important;
@@ -168,7 +168,6 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     color: var(--accent) !important;
 }
 
-/* 하단 강조선 제거 */
 [data-baseweb="tab-highlight"] { display: none !important; }
 
 [data-baseweb="select"] > div { min-height: 2.2rem !important; background-color: var(--surface-2) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
@@ -280,6 +279,10 @@ def render_mini_grid(cards: list):
         parts.append(f'<div class="mini-card"><div class="mini-label">{c["label"]}</div><div class="mini-value">{c["value"]}</div>{tag_html}</div>')
     st.markdown(f'<div class="mini-grid">{"".join(parts)}</div>', unsafe_allow_html=True)
 
+# 💡 셀렉트박스 변경 시 한 번에 바로 즉시 동기화시키는 콜백 함수
+def on_ticker_change():
+    st.session_state["current_ticker"] = st.session_state["ticker_select_box"]
+
 # =========================================================
 # [6] 사이드바
 # =========================================================
@@ -294,8 +297,16 @@ with st.sidebar:
 st.markdown('<div class="title-banner">📈 AI 텐배거 발굴기 Pro</div>', unsafe_allow_html=True)
 
 selected_index = st.session_state["watchlist"].index(st.session_state["current_ticker"]) if st.session_state["current_ticker"] in st.session_state["watchlist"] else 0
-ticker = st.selectbox("🔍 분석 대상 종목", st.session_state["watchlist"], index=selected_index, label_visibility="collapsed")
-st.session_state["current_ticker"] = ticker
+
+# 💡 key 및 on_change 적용으로 2번 클릭 현상 완벽 해결
+ticker = st.selectbox(
+    "🔍 분석 대상 종목", 
+    st.session_state["watchlist"], 
+    index=selected_index, 
+    key="ticker_select_box",
+    on_change=on_ticker_change,
+    label_visibility="collapsed"
+)
 
 with st.expander("➕ 종목 관리"):
     new_ticker = st.text_input("새 종목 코드 추가", placeholder="예: NVDA", label_visibility="collapsed")
