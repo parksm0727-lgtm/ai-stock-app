@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 import os
 import uuid
+import time
 
 # =========================================================
 # [1] 페이지 설정 (반드시 가장 먼저 호출)
@@ -46,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (타이틀 배너 잘림 현상 완벽 해결)
+# [3] 디자인 시스템 (타이틀 하단 잘림 해결)
 # =========================================================
 st.markdown("""
 <style>
@@ -73,24 +74,30 @@ html, body, .stApp, [data-testid="stSidebar"], [data-testid="stHeader"] {
 }
 h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
-/* 💡 타이틀 배너 - 상단 겹침 해결을 위해 마진 리셋 */
+/* 💡 타이틀 배너 - 아래쪽 잘림 완벽 방지를 위한 패딩 및 정렬 추가 */
 .title-banner {
     background: linear-gradient(135deg, #1E293B 0%, #1D4ED8 50%, #3B82F6 100%);
     color: #ffffff;
     text-align: center;
     font-weight: 800;
     font-size: clamp(1.4rem, 6vw, 1.8rem);
-    padding: 12px 10px;
+    padding: 16px 10px !important; /* 위아래 여백을 넉넉히 확보 */
     border-radius: 12px;
-    margin-top: 0px !important; /* 상단 겹침 원인 제거 */
-    margin-bottom: 8px;
+    margin-top: 5px !important; 
+    margin-bottom: 12px !important;
     box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     letter-spacing: -0.5px;
     width: 100%;
     border: 1px solid #38BDF8;
+    line-height: 1.4 !important; /* 글자가 영역을 넘어가지 않도록 고정 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    overflow: visible !important;
 }
 
-/* 💡 페이지 전체 상단 여백 확보 (4rem)로 상단바 가림 방지 */
+/* 페이지 상단바 겹침 방지 여백 */
 .block-container {
     padding-top: 4rem !important; 
     padding-bottom: 0.5rem !important;
@@ -122,7 +129,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     border: 1px solid var(--border); margin-top: 4px; margin-right: 4px;
 }
 
-/* 미니 지표 카드 공간 축소 */
+/* 미니 지표 카드 */
 .mini-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -139,7 +146,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 .mini-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1rem; color: var(--text); white-space: nowrap; }
 .mini-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; margin-top: 2px; font-weight: 600; }
 
-/* 탭 높이 압축 */
+/* 탭 높이 */
 .stTabs [data-baseweb="tab-list"], [data-testid="stTabs"] [role="tablist"] {
     background-color: var(--surface) !important;
     border: 1px solid var(--border) !important;
@@ -160,11 +167,21 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 [data-testid="stTabs"] [data-baseweb="tab-highlight"] { display: none !important; }
 .stTabs { margin-bottom: 0 !important; }
 
-/* 셀렉트박스 등 기타 UI 타이트하게 */
+/* 셀렉트박스 및 버튼 */
 [data-baseweb="select"] > div { min-height: 2.2rem !important; background-color: var(--surface-2) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
 [data-testid="stExpander"] { background-color: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: var(--radius) !important; margin-bottom: 0px !important; }
 [data-testid="stExpander"] summary p { font-size: 0.85rem !important; padding: 4px 0 !important; }
-[data-testid="stSliderTickBar"] { display: none !important; } /* 슬라이더 눈금 숨겨서 공간 확보 */
+[data-testid="stSliderTickBar"] { display: none !important; }
+
+.stButton>button {
+    background: var(--accent-strong) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    padding: 0.5rem 1rem !important;
+}
+button[kind="primary"] { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%) !important; }
 
 </style>
 """, unsafe_allow_html=True)
@@ -181,7 +198,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩
+# [5] 데이터 로딩 & AI 호출 (503 에러 자동 재시도 로직 추가)
 # =========================================================
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -214,8 +231,21 @@ def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
 
 @st.cache_data(ttl=21600, show_spinner=False)
 def cached_ai_text(api_key: str, model_name: str, prompt: str) -> str:
+    # 💡 503 에러 방어: 3번까지 자동으로 재시도
     client = genai.Client(api_key=api_key)
-    return client.models.generate_content(model=model_name, contents=prompt).text
+    last_err = None
+    for attempt in range(3):
+        try:
+            return client.models.generate_content(model=model_name, contents=prompt).text
+        except Exception as e:
+            last_err = e
+            err_msg = str(e).lower()
+            if "503" in err_msg or "unavailable" in err_msg or "429" in err_msg:
+                time.sleep(2) # 2초 대기 후 재시도
+                continue
+            else:
+                raise e
+    raise last_err
 
 def get_active_gemini_key(sidebar_key: str) -> str:
     return sidebar_key or os.environ.get("GEMINI_API_KEY", "")
@@ -233,7 +263,8 @@ def render_mini_grid(cards: list):
 with st.sidebar:
     st.markdown("### ⚙️ 시스템 설정")
     api_key_input = st.text_input("Gemini API Key", type="password")
-    model_name = st.text_input("Gemini 모델명", value="gemini-flash-latest")
+    # 안정적인 1.5 플래시 모델로 기본값 변경
+    model_name = st.text_input("Gemini 모델명", value="gemini-1.5-flash")
 
 # =========================================================
 # [7] 메인 화면 타이틀 배너 및 종목 선택
@@ -326,7 +357,7 @@ with tab2:
         if not active_key:
             st.error("API 키를 입력해 주세요.")
         else:
-            with st.spinner("분석 중..."):
+            with st.spinner("분석 중... (요청이 많으면 시간이 조금 걸릴 수 있습니다)"):
                 recent_news = load_news(ticker)[:10]
                 news_items = []
                 for item in recent_news:
@@ -335,8 +366,10 @@ with tab2:
                     news_items.append(f"- {title}")
                 news_text = "\n".join(news_items) if news_items else "최신 뉴스가 없습니다."
                 prompt = f"현재 시점은 {date.today().year}년입니다. '{ticker}' 최신 뉴스:\n{news_text}\n이를 바탕으로 단기 촉매제와 장기 리스크 요약해 줘."
-                try: st.markdown(cached_ai_text(active_key, model_name, prompt))
-                except Exception as e: st.error(f"오류: {e}")
+                try: 
+                    st.markdown(cached_ai_text(active_key, model_name, prompt))
+                except Exception as e: 
+                    st.error(f"서버가 현재 혼잡합니다. 잠시 후 다시 시도해 주세요. (오류 메시지: {e})")
 
 # ========================================================
 # TAB 3: 🎯 목표 & 시뮬레이터
@@ -370,9 +403,11 @@ with tab4:
         active_key = get_active_gemini_key(api_key_input)
         if not active_key: st.error("API 키 필요")
         else:
-            with st.spinner("분석 중..."):
-                try: st.markdown(cached_ai_text(active_key, model_name, f"현재 {date.today().year}년. '{sector_choice}' 10배 성장 유망 미국 중소형주 3곳 요약."))
-                except Exception as e: st.error(f"오류: {e}")
+            with st.spinner("분석 중... (요청이 많으면 시간이 조금 걸릴 수 있습니다)"):
+                try: 
+                    st.markdown(cached_ai_text(active_key, model_name, f"현재 {date.today().year}년. '{sector_choice}' 10배 성장 유망 미국 중소형주 3곳 요약."))
+                except Exception as e: 
+                    st.error(f"서버가 현재 혼잡합니다. 잠시 후 다시 시도해 주세요. (오류 메시지: {e})")
 
 # ========================================================
 # TAB 5: 📝 투자 일지
