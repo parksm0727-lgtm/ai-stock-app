@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (탭 5개 가로 균등 분할 완벽 보장 CSS)
+# [3] 디자인 시스템 (탭 5개 완벽 가로 균등 분할 CSS)
 # =========================================================
 st.markdown("""
 <style>
@@ -134,17 +134,8 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 .mini-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1rem; color: var(--text); white-space: nowrap; }
 .mini-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; margin-top: 2px; font-weight: 600; }
 
-/* 💡 탭 전체 폭 가로 균등 분할 (1:1:1:1:1 강제 지정) */
-div[data-testid="stTabs"] {
-    width: 100% !important;
-}
-
-div[data-testid="stTabs"] > div {
-    width: 100% !important;
-}
-
-div[data-testid="stTabs"] [data-baseweb="tab-list"],
-div[data-testid="stTabs"] [role="tablist"] {
+/* 💡 [핵심] 최신 Streamlit 전용 탭 5개 가로 1:1:1:1:1 강제 분할 CSS */
+.stTabs [data-baseweb="tab-list"] {
     display: flex !important;
     width: 100% !important;
     background-color: var(--surface) !important;
@@ -155,11 +146,12 @@ div[data-testid="stTabs"] [role="tablist"] {
     box-sizing: border-box !important;
 }
 
-div[data-testid="stTabs"] [data-baseweb="tab"],
-div[data-testid="stTabs"] button[role="tab"] {
-    flex: 1 1 0% !important;
+.stTabs [data-baseweb="tab-list"] button {
+    flex-grow: 1 !important;
+    flex-shrink: 1 !important;
+    flex-basis: 0 !important;
     width: 100% !important;
-    min-width: 0 !important;
+    max-width: 100% !important;
     text-align: center !important;
     justify-content: center !important;
     align-items: center !important;
@@ -171,13 +163,13 @@ div[data-testid="stTabs"] button[role="tab"] {
     margin: 0 !important;
 }
 
-div[data-testid="stTabs"] [aria-selected="true"],
-div[data-testid="stTabs"] button[aria-selected="true"] {
+.stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
     background-color: var(--surface-2) !important;
     color: var(--accent) !important;
 }
 
-[data-testid="stTabs"] [data-baseweb="tab-highlight"] { display: none !important; }
+/* 하단 강조선 제거 */
+[data-baseweb="tab-highlight"] { display: none !important; }
 
 [data-baseweb="select"] > div { min-height: 2.2rem !important; background-color: var(--surface-2) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
 [data-testid="stExpander"] { background-color: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: var(--radius) !important; }
@@ -196,7 +188,7 @@ button[kind="primary"] { background: linear-gradient(135deg, var(--accent) 0%, v
 """, unsafe_allow_html=True)
 
 # =========================================================
-# [4] 파일 기반 영구 저장소 (관심 종목, AI 리포트, AI 추천)
+# [4] 파일 기반 영구 저장소
 # =========================================================
 WATCHLIST_FILE = "watchlist.json"
 REPORT_FILE = "ai_reports.json"
