@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (타이틀 하단 잘림 해결)
+# [3] 디자인 시스템 (타이틀 두께 슬림화)
 # =========================================================
 st.markdown("""
 <style>
@@ -74,14 +74,14 @@ html, body, .stApp, [data-testid="stSidebar"], [data-testid="stHeader"] {
 }
 h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
-/* 💡 타이틀 배너 - 아래쪽 잘림 완벽 방지를 위한 패딩 및 정렬 추가 */
+/* 💡 타이틀 배너 - 두께 슬림화 (위아래 padding 축소) */
 .title-banner {
     background: linear-gradient(135deg, #1E293B 0%, #1D4ED8 50%, #3B82F6 100%);
     color: #ffffff;
     text-align: center;
     font-weight: 800;
     font-size: clamp(1.4rem, 6vw, 1.8rem);
-    padding: 16px 10px !important; /* 위아래 여백을 넉넉히 확보 */
+    padding: 8px 10px !important; /* 두께 대폭 축소 */
     border-radius: 12px;
     margin-top: 5px !important; 
     margin-bottom: 12px !important;
@@ -89,12 +89,11 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     letter-spacing: -0.5px;
     width: 100%;
     border: 1px solid #38BDF8;
-    line-height: 1.4 !important; /* 글자가 영역을 넘어가지 않도록 고정 */
+    line-height: 1.2 !important; 
     display: flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    overflow: visible !important;
 }
 
 /* 페이지 상단바 겹침 방지 여백 */
@@ -198,7 +197,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & AI 호출 (503 에러 자동 재시도 로직 추가)
+# [5] 데이터 로딩 & AI 호출
 # =========================================================
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -231,7 +230,6 @@ def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
 
 @st.cache_data(ttl=21600, show_spinner=False)
 def cached_ai_text(api_key: str, model_name: str, prompt: str) -> str:
-    # 💡 503 에러 방어: 3번까지 자동으로 재시도
     client = genai.Client(api_key=api_key)
     last_err = None
     for attempt in range(3):
@@ -241,7 +239,7 @@ def cached_ai_text(api_key: str, model_name: str, prompt: str) -> str:
             last_err = e
             err_msg = str(e).lower()
             if "503" in err_msg or "unavailable" in err_msg or "429" in err_msg:
-                time.sleep(2) # 2초 대기 후 재시도
+                time.sleep(2)
                 continue
             else:
                 raise e
@@ -263,7 +261,6 @@ def render_mini_grid(cards: list):
 with st.sidebar:
     st.markdown("### ⚙️ 시스템 설정")
     api_key_input = st.text_input("Gemini API Key", type="password")
-    # 안정적인 1.5 플래시 모델로 기본값 변경
     model_name = st.text_input("Gemini 모델명", value="gemini-1.5-flash")
 
 # =========================================================
@@ -357,7 +354,7 @@ with tab2:
         if not active_key:
             st.error("API 키를 입력해 주세요.")
         else:
-            with st.spinner("분석 중... (요청이 많으면 시간이 조금 걸릴 수 있습니다)"):
+            with st.spinner("분석 중..."):
                 recent_news = load_news(ticker)[:10]
                 news_items = []
                 for item in recent_news:
@@ -369,7 +366,7 @@ with tab2:
                 try: 
                     st.markdown(cached_ai_text(active_key, model_name, prompt))
                 except Exception as e: 
-                    st.error(f"서버가 현재 혼잡합니다. 잠시 후 다시 시도해 주세요. (오류 메시지: {e})")
+                    st.error(f"서버 혼잡. (오류: {e})")
 
 # ========================================================
 # TAB 3: 🎯 목표 & 시뮬레이터
@@ -403,14 +400,14 @@ with tab4:
         active_key = get_active_gemini_key(api_key_input)
         if not active_key: st.error("API 키 필요")
         else:
-            with st.spinner("분석 중... (요청이 많으면 시간이 조금 걸릴 수 있습니다)"):
+            with st.spinner("분석 중..."):
                 try: 
                     st.markdown(cached_ai_text(active_key, model_name, f"현재 {date.today().year}년. '{sector_choice}' 10배 성장 유망 미국 중소형주 3곳 요약."))
                 except Exception as e: 
-                    st.error(f"서버가 현재 혼잡합니다. 잠시 후 다시 시도해 주세요. (오류 메시지: {e})")
+                    st.error(f"서버 혼잡. (오류: {e})")
 
 # ========================================================
-# TAB 5: 📝 투자 일지
+# TAB 5: 📝 투자 일지 (삭제 기능 완벽 복구)
 # ========================================================
 with tab5:
     def load_journal():
@@ -439,8 +436,20 @@ with tab5:
 
     df_journal = load_journal()
     if not df_journal.empty:
-        edited_df = st.data_editor(df_journal[df_journal["Ticker"] == ticker], num_rows="fixed", hide_index=True, key="j_editor")
-        if st.button("💾 변경 저장", use_container_width=True):
+        st.caption("💡 표 좌측 끝 상자를 선택하고, 우측 상단의 🗑️ 휴지통 아이콘을 누르면 삭제됩니다.")
+        
+        # 💡 [삭제 기능 복구] num_rows="dynamic"으로 설정하여 기본 삭제 UI 재활성화
+        edited_df = st.data_editor(
+            df_journal[df_journal["Ticker"] == ticker], 
+            num_rows="dynamic", 
+            hide_index=True, 
+            key="j_editor",
+            column_config={
+                "ID": st.column_config.TextColumn(disabled=True) # ID는 실수로 못 건드리게 잠금
+            }
+        )
+        
+        if st.button("💾 변경 및 삭제 저장", use_container_width=True):
             other_rows = df_journal[df_journal["Ticker"] != ticker]
             save_journal(pd.concat([other_rows, edited_df], ignore_index=True))
             st.rerun()
