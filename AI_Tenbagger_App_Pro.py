@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 import os
 import uuid
-import time
+import json
 
 # =========================================================
 # [1] 페이지 설정
@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (깔끔한 타이틀 및 여백 설정)
+# [3] 디자인 시스템 (타이틀 가림 방지 상단 여백 4.2rem 확보)
 # =========================================================
 st.markdown("""
 <style>
@@ -74,9 +74,9 @@ html, body, .stApp, [data-testid="stSidebar"], [data-testid="stHeader"] {
 }
 h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
-/* 💡 타이틀 영역 가림 해결 */
+/* 💡 타이틀 잘림 방지: 상단 패딩을 4.2rem으로 확장 */
 .block-container {
-    padding-top: 2.2rem !important;
+    padding-top: 4.2rem !important;
     padding-bottom: 0.5rem !important;
     padding-left: 0.6rem !important;
     padding-right: 0.6rem !important;
@@ -85,10 +85,10 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 [data-testid="stVerticalBlock"] { gap: 0.1rem !important; }
 [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
 
-/* 타이틀 헤더 가독성 */
+/* 헤더 상단 가독성 스타일 */
 .app-header {
     text-align: center;
-    padding: 8px 0 12px 0;
+    padding: 4px 0 10px 0;
     margin-bottom: 8px;
     border-bottom: 1px solid var(--border);
 }
@@ -166,20 +166,41 @@ button[kind="primary"] { background: linear-gradient(135deg, var(--accent) 0%, v
 """, unsafe_allow_html=True)
 
 # =========================================================
-# [4] 세션 상태 초기화
+# [4] 파일 기반 관심 종목 및 일지 영구 저장 관리
 # =========================================================
+WATCHLIST_FILE = "watchlist.json"
+DEFAULT_WATCHLIST = ["ASTS", "OKLO", "IONQ", "RXRX", "PLTR", "TSLA"]
+
+def load_saved_watchlist():
+    if os.path.exists(WATCHLIST_FILE):
+        try:
+            with open(WATCHLIST_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list) and len(data) > 0:
+                    return data
+        except Exception:
+            pass
+    return DEFAULT_WATCHLIST.copy()
+
+def save_watchlist(watchlist):
+    try:
+        with open(WATCHLIST_FILE, "w", encoding="utf-8") as f:
+            json.dump(watchlist, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        st.error(f"종목 목록 저장 실패: {e}")
+
 if "watchlist" not in st.session_state:
-    st.session_state["watchlist"] = ["ASTS", "OKLO", "IONQ", "RXRX", "PLTR", "TSLA"]
-if "current_ticker" not in st.session_state:
-    st.session_state["current_ticker"] = "ASTS"
+    st.session_state["watchlist"] = load_saved_watchlist()
+
+if "current_ticker" not in st.session_state or st.session_state["current_ticker"] not in st.session_state["watchlist"]:
+    st.session_state["current_ticker"] = st.session_state["watchlist"][0]
 
 JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & AI 호출 (최신 주가 및 최신 AI 모델 대응)
+# [5] 데이터 로딩 & AI 호출
 # =========================================================
-# 💡 최신 데이터 실시간 불러오기 (ttl 300초로 짧게 조정하여 최신 주가 보장)
 @st.cache_data(ttl=300, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
     try:
@@ -188,7 +209,6 @@ def load_price_data(t: str) -> pd.DataFrame:
         if data.empty:
             return pd.DataFrame()
         data.reset_index(inplace=True)
-        # 날짜 포맷 통일
         data["Date"] = pd.to_datetime(data["Date"]).dt.tz_localize(None)
         return data
     except Exception:
@@ -260,12 +280,15 @@ with st.expander("➕ 종목 관리"):
         if t and is_valid_ticker(t) and t not in st.session_state["watchlist"]:
             st.session_state["watchlist"].append(t)
             st.session_state["current_ticker"] = t
+            save_watchlist(st.session_state["watchlist"]) # 파일로 영구 저장
             st.rerun()
 
     del_ticker = st.selectbox("삭제할 종목 선택", st.session_state["watchlist"], key="del_ticker_main", label_visibility="collapsed")
     if st.button("종목 삭제", use_container_width=True, disabled=len(st.session_state["watchlist"]) <= 1):
         st.session_state["watchlist"].remove(del_ticker)
-        if st.session_state["current_ticker"] == del_ticker: st.session_state["current_ticker"] = st.session_state["watchlist"][0]
+        if st.session_state["current_ticker"] == del_ticker: 
+            st.session_state["current_ticker"] = st.session_state["watchlist"][0]
+        save_watchlist(st.session_state["watchlist"]) # 파일로 영구 저장
         st.rerun()
 
 with st.spinner("최신 주가 데이터 로딩 중..."):
