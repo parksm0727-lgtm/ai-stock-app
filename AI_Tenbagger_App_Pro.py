@@ -1,4 +1,4 @@
-import streamlit as st
+·import streamlit as st
 import yfinance as yf
 from prophet import Prophet
 import plotly.graph_objs as go
@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (폭 채움 배너, 탭 균등 배치 CSS)
+# [3] 디자인 시스템 (탭 5개 가로 균등 분할 완벽 보장 CSS)
 # =========================================================
 st.markdown("""
 <style>
@@ -134,30 +134,49 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 .mini-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1rem; color: var(--text); white-space: nowrap; }
 .mini-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; margin-top: 2px; font-weight: 600; }
 
-/* 💡 탭 메뉴 양쪽 균등 배치 (Flexbox) */
-.stTabs [data-baseweb="tab-list"], [data-testid="stTabs"] [role="tablist"] {
+/* 💡 탭 전체 폭 가로 균등 분할 (1:1:1:1:1 강제 지정) */
+div[data-testid="stTabs"] {
+    width: 100% !important;
+}
+
+div[data-testid="stTabs"] > div {
+    width: 100% !important;
+}
+
+div[data-testid="stTabs"] [data-baseweb="tab-list"],
+div[data-testid="stTabs"] [role="tablist"] {
+    display: flex !important;
+    width: 100% !important;
     background-color: var(--surface) !important;
     border: 1px solid var(--border) !important;
     border-radius: 8px !important;
     padding: 2px !important;
     gap: 2px !important;
-    display: flex !important;
-    width: 100% !important;
+    box-sizing: border-box !important;
 }
-.stTabs [data-baseweb="tab"], [data-testid="stTabs"] button[role="tab"] {
-    flex: 1 1 0% !important; /* 각 탭을 동일한 너비로 강제 확장 */
+
+div[data-testid="stTabs"] [data-baseweb="tab"],
+div[data-testid="stTabs"] button[role="tab"] {
+    flex: 1 1 0% !important;
+    width: 100% !important;
+    min-width: 0 !important;
     text-align: center !important;
     justify-content: center !important;
+    align-items: center !important;
     color: var(--text-muted) !important;
     border-radius: 6px !important;
     font-weight: 600 !important;
-    font-size: 0.8rem !important;
+    font-size: 0.78rem !important;
     padding: 6px 0px !important;
+    margin: 0 !important;
 }
-.stTabs [aria-selected="true"], [data-testid="stTabs"] button[aria-selected="true"] {
+
+div[data-testid="stTabs"] [aria-selected="true"],
+div[data-testid="stTabs"] button[aria-selected="true"] {
     background-color: var(--surface-2) !important;
     color: var(--accent) !important;
 }
+
 [data-testid="stTabs"] [data-baseweb="tab-highlight"] { display: none !important; }
 
 [data-baseweb="select"] > div { min-height: 2.2rem !important; background-color: var(--surface-2) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
@@ -206,7 +225,6 @@ if "watchlist" not in st.session_state:
 if "current_ticker" not in st.session_state or st.session_state["current_ticker"] not in st.session_state["watchlist"]:
     st.session_state["current_ticker"] = st.session_state["watchlist"][0]
 
-# 영구 파일 로딩
 if "ai_report_cache" not in st.session_state:
     st.session_state["ai_report_cache"] = load_json_file(REPORT_FILE, {})
 if "ai_recommend_cache" not in st.session_state:
@@ -358,7 +376,7 @@ with tab1:
         st.plotly_chart(fig_chart, use_container_width=True)
 
 # ========================================================
-# TAB 2: AI 리포트 (생성 일자 표기 및 파일 영구 저장)
+# TAB 2: AI 리포트
 # ========================================================
 with tab2:
     active_key = get_active_gemini_key(api_key_input)
@@ -374,7 +392,6 @@ with tab2:
                 try: 
                     res_text = get_ai_text(active_key, model_name, prompt)
                     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-                    # 영구 파일 저장용 객체 구성
                     st.session_state["ai_report_cache"][ticker] = {
                         "created_at": now_str,
                         "content": res_text
@@ -383,7 +400,6 @@ with tab2:
                 except Exception as e: 
                     st.error(f"오류 발생: {e}")
 
-    # 기존 저장된 데이터 상시 출력
     if ticker in st.session_state["ai_report_cache"]:
         item = st.session_state["ai_report_cache"][ticker]
         st.caption(f"📅 **생성 일시:** `{item['created_at']}`")
@@ -413,7 +429,7 @@ with tab3:
     st.plotly_chart(fig_sim, use_container_width=True)
 
 # ========================================================
-# TAB 4: 추천 (생성 일자 표기 및 파일 영구 저장)
+# TAB 4: 추천
 # ========================================================
 with tab4:
     sector_choice = st.selectbox("분야 선택", ["우주 항공 및 통신", "AI 바이오 헬스케어", "차세대 에너지 (SMR)", "양자 컴퓨팅"])
@@ -426,7 +442,6 @@ with tab4:
                 try: 
                     res_text = get_ai_text(active_key, model_name, f"현재 시점 {date.today().year}년. '{sector_choice}' 분야 10배 성장 유망 중소형주 3개 요약.")
                     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-                    # 영구 파일 저장용 객체 구성
                     st.session_state["ai_recommend_cache"][sector_choice] = {
                         "created_at": now_str,
                         "content": res_text
@@ -435,7 +450,6 @@ with tab4:
                 except Exception as e: 
                     st.error(f"오류 발생: {e}")
 
-    # 기존 저장된 데이터 상시 출력
     if sector_choice in st.session_state["ai_recommend_cache"]:
         item = st.session_state["ai_recommend_cache"][sector_choice]
         st.caption(f"📅 **생성 일시:** `{item['created_at']}`")
