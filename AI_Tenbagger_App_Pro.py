@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템
+# [3] 디자인 시스템 (타이틀 무조건 한 줄 유지 CSS)
 # =========================================================
 st.markdown("""
 <style>
@@ -84,20 +84,24 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 [data-testid="stVerticalBlock"] { gap: 0.1rem !important; }
 [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
 
+/* 💡 무조건 한 줄 표시 타이틀 배너 */
 .title-banner {
     background: linear-gradient(135deg, #1E293B 0%, #1D4ED8 50%, #3B82F6 100%);
     color: #ffffff;
     text-align: center;
     font-weight: 800;
-    font-size: clamp(1.3rem, 5.5vw, 1.7rem);
-    padding: 10px 12px !important;
+    font-size: clamp(0.95rem, 4.2vw, 1.5rem) !important; /* 반응형 자동 폰트 크기 조절 */
+    white-space: nowrap !important;                      /* 줄바꿈 완전히 금지 */
+    overflow: hidden !important;                         /* 넘어감 방지 */
+    text-overflow: ellipsis !important;
+    padding: 10px 8px !important;
     border-radius: 12px;
     margin-bottom: 10px !important;
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     letter-spacing: -0.5px;
     width: 100%;
     border: 1.5px solid #38BDF8;
-    line-height: 1.3 !important;
+    line-height: 1.2 !important;
     box-sizing: border-box;
 }
 
@@ -376,7 +380,6 @@ with tab1:
         fig_chart.update_yaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4", size=9))
         st.plotly_chart(fig_chart, use_container_width=True)
 
-        # 💡 [해결] HTML 코드 블록 텍스트 깨짐 방지: Pure Markdown 컨테이너 출력
         trend_desc = "하락 조정" if delta < 0 else "상승 흐름"
         st.markdown("---")
         st.subheader(f"📊 {ticker} 현재 주가 현황 및 분석")
