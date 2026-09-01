@@ -56,7 +56,7 @@ ensure_theme_config()
 # =========================================================
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 :root {
     --bg: #0B1120;
@@ -75,7 +75,7 @@ st.markdown("""
 html, body, .stApp, [data-testid="stSidebar"], [data-testid="stHeader"] {
     background-color: var(--bg) !important;
     color: var(--text) !important;
-    font-family: 'Inter', -apple-system, sans-serif !important;
+    font-family: 'Inter', 'Noto Sans KR', -apple-system, sans-serif !important;
 }
 h1, h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
@@ -149,7 +149,7 @@ h1 + div { color: var(--text-muted) !important; font-size: 0.9rem; }
     color: var(--text) !important;
     border: 1px solid var(--border) !important;
     border-radius: 8px !important;
-    font-family: 'Inter', sans-serif !important;
+    font-family: 'Inter', 'Noto Sans KR', sans-serif !important;
 }
 [data-baseweb="select"] > div { background-color: var(--surface-2) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
 [data-baseweb="menu"], [data-baseweb="popover"] { background-color: var(--surface) !important; border: 1px solid var(--border) !important; }
@@ -184,9 +184,29 @@ button[kind="primary"] { background: linear-gradient(135deg, var(--accent) 0%, v
 }
 [data-testid="stTabs"] [data-baseweb="tab-highlight"] { background-color: transparent !important; }
 
-/* 전반적인 여백 축소 (모바일에서 카드 사이 공백이 과도했던 문제) */
-.block-container { padding-top: 1.4rem !important; padding-bottom: 2rem !important; }
-[data-testid="stVerticalBlock"] { gap: 0.55rem !important; }
+/* 전반적인 여백 축소 (모바일에서 카드 사이 공백이 과도했던 문제 + 스크롤 최소화) */
+.block-container {
+    padding-top: 0.9rem !important;
+    padding-bottom: 1.2rem !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    max-width: 720px !important;
+}
+[data-testid="stVerticalBlock"] { gap: 0.35rem !important; }
+[data-testid="stElementContainer"] { margin-bottom: 0 !important; }
+h1 { margin-top: 0 !important; }
+.hero-price { padding: 4px 0 10px 0 !important; margin-bottom: 10px !important; }
+.mini-grid { margin: 2px 0 10px 0 !important; }
+[data-testid="stSliderTickBar"] { margin-bottom: 0 !important; }
+
+/* 화면 크기별 자동 조정: 작은 화면일수록 여백/글자 크기를 한 단계씩 더 줄임 */
+@media (max-width: 480px) {
+    .block-container { padding-left: 0.7rem !important; padding-right: 0.7rem !important; }
+    .hero-value { font-size: clamp(1.7rem, 9vw, 2.2rem) !important; }
+    .mini-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    .mini-value { font-size: 1.15rem !important; white-space: nowrap; }
+    .mini-card { padding: 9px 10px !important; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -386,7 +406,6 @@ with tab1:
             {"label": "52주 최고가", "value": f"${data['Close'].tail(252).max():,.2f}"},
         ])
 
-        st.write("")
         years = st.slider("미래 예측 기간 (년)", 1, 5, 2)
         df_train = data[["Date", "Close"]].copy().rename(columns={"Date": "ds", "Close": "y"})
 
@@ -418,9 +437,9 @@ with tab1:
 
         fig_chart.update_layout(
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#ECEFF4"), margin=dict(l=10, r=10, t=10, b=10),
-            legend=dict(orientation="h", y=-0.12, yanchor="top", font=dict(size=11, color="#ECEFF4")),
-            height=520,
+            font=dict(color="#ECEFF4"), margin=dict(l=8, r=8, t=8, b=8),
+            legend=dict(orientation="h", y=-0.14, yanchor="top", font=dict(size=10, color="#ECEFF4")),
+            height=360,
         )
         fig_chart.update_xaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4"))
         fig_chart.update_yaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4"), row=1, col=1)
@@ -470,7 +489,6 @@ with tab2:
                     st.error(f"오류 발생: {e}")
                     st.caption("모델명이 잘못되었거나 API 키가 유효하지 않을 수 있습니다. 사이드바의 모델명을 확인해 보세요.")
 
-    st.write("")
     with st.expander("💼 기관 투자자 보유 현황 (Smart Money)"):
         holders = load_institutional_holders(ticker)
         if holders is not None and not holders.empty:
@@ -599,7 +617,6 @@ with tab5:
         # 티커 선택지에는 관심 종목 + 일지에 이미 남아있는 과거 종목을 모두 포함
         ticker_options = sorted(set(st.session_state["watchlist"]) | set(df_journal["Ticker"].dropna().unique().tolist()))
 
-        st.write("")
         st.markdown("### 📋 일지 기록 (내용 수정)")
         st.caption("💡 날짜는 달력에서, 티커·구분은 목록에서 선택해 수정할 수 있어요. 메모(Reason)만 자유 입력입니다.")
 
@@ -630,7 +647,6 @@ with tab5:
             st.success("일지 변경사항이 저장되었습니다!")
             st.rerun()
 
-        st.write("")
         st.markdown("### 🗑️ 일지 삭제")
         st.caption("항목 옆 '삭제' 버튼을 누르면 확인 없이 바로 지워집니다.")
         view_df_sorted = view_df.sort_values("Date", ascending=False, na_position="last")
