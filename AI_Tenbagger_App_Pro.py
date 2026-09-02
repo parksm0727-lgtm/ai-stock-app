@@ -17,7 +17,7 @@ import pytz
 # =========================================================
 # [1] 페이지 설정
 # =========================================================
-st.set_page_config(page_title="AI 텐배거 프로", layout="centered", page_icon="📈")
+st.set_page_config(page_title="AI 주식 투자분석", layout="centered", page_icon="📈")
 
 # =========================================================
 # [2] 앱 테마 설정
@@ -34,7 +34,7 @@ def ensure_theme_config():
         'backgroundColor="#0B1120"\n'
         'secondaryBackgroundColor="#141B2E"\n'
         'textColor="#ECEFF4"\n'
-        'primaryColor="#5B9DF9"\n'
+        'primaryColor="#F59E0B"\n'
     )
     try:
         already_dark = os.path.exists(config_path) and 'base="dark"' in open(config_path, encoding="utf-8").read()
@@ -49,11 +49,11 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (가독성 최적화 & 깔끔한 카드 스타일)
+# [3] 디자인 시스템 (이미지 스타일 타이틀 반영)
 # =========================================================
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+KR:wght@400;500;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 :root {
     --bg: #0B1120;
@@ -62,10 +62,10 @@ st.markdown("""
     --border: #262F45;
     --text: #ECEFF4;
     --text-muted: #8A94AC;
-    --accent: #5B9DF9;
-    --accent-strong: #3B82F6;
-    --up: #F87171;    /* 상승: 빨간색 */
-    --down: #60A5FA;  /* 하락: 파란색 */
+    --accent: #F59E0B;       /* 주황~황금 테마 포인트 */
+    --accent-strong: #D97706;
+    --up: #F87171;           /* 상승: 빨간색 */
+    --down: #60A5FA;         /* 하락: 파란색 */
     --radius: 8px;
 }
 
@@ -84,26 +84,37 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     max-width: 720px !important;
 }
 
-/* 최상단 메인 타이틀 배너 */
-.title-banner {
-    background: linear-gradient(135deg, #1E293B 0%, #1D4ED8 50%, #3B82F6 100%);
-    color: #ffffff;
+/* 💡 요청하신 이미지 스타일 메인 타이틀 배너 */
+.title-banner-container {
+    background: linear-gradient(180deg, #1A1F2C 0%, #0F1420 100%);
+    border: 1.5px solid #F59E0B;
+    border-radius: 14px;
+    padding: 14px 10px 12px 10px;
     text-align: center;
-    font-weight: 800;
-    font-size: clamp(0.95rem, 4.8vw, 1.6rem) !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    padding: 12px 10px !important;
-    border-radius: 12px;
-    margin-bottom: 12px !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    letter-spacing: -0.5px;
-    width: 100% !important;
-    display: block !important;
-    border: 1.5px solid #38BDF8;
-    line-height: 1.2 !important;
-    box-sizing: border-box !important;
+    margin-bottom: 14px;
+    box-shadow: 0 6px 16px rgba(245, 158, 11, 0.15);
+}
+
+.title-main-text {
+    font-family: 'Noto Sans KR', 'Inter', sans-serif;
+    font-weight: 900;
+    font-size: clamp(1.4rem, 6vw, 2.1rem);
+    background: linear-gradient(180deg, #FFD000 0%, #FF7A00 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0px 2px 8px rgba(255, 122, 0, 0.3);
+    letter-spacing: -1px;
+    line-height: 1.15;
+    margin-bottom: 4px;
+}
+
+.title-sub-text {
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    font-size: clamp(0.75rem, 3.2vw, 1.05rem);
+    color: #FFFFFF;
+    letter-spacing: -0.2px;
+    opacity: 0.95;
 }
 
 /* 분석 섹션 타이틀 */
@@ -132,7 +143,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 .analysis-card-title {
     font-size: 0.9rem;
     font-weight: 700;
-    color: var(--accent);
+    color: #F87171;
     margin-bottom: 10px;
     border-bottom: 1px solid var(--border);
     padding-bottom: 6px;
@@ -143,18 +154,18 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     color: #DDE1E8;
 }
 
-/* 카드 내부 가독성을 높이는 태그 및 불릿 디자인 */
+/* 배지 스타일 및 항목 디자인 */
 .sub-badge {
     display: inline-block;
-    background-color: #1E293B;
-    color: #38BDF8;
+    background-color: #271E10;
+    color: #F59E0B;
     font-weight: 700;
     font-size: 0.8rem;
     padding: 2px 8px;
     border-radius: 4px;
     margin-top: 8px;
     margin-bottom: 6px;
-    border: 1px solid #334155;
+    border: 1px solid #78350F;
 }
 
 .sub-item {
@@ -224,7 +235,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
 .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
     background-color: var(--surface-2) !important;
-    color: var(--accent) !important;
+    color: #F59E0B !important;
 }
 
 [data-baseweb="tab-highlight"] { display: none !important; }
@@ -234,14 +245,13 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 [data-testid="stExpander"] summary p { font-size: 0.85rem !important; padding: 4px 0 !important; }
 
 .stButton>button {
-    background: var(--accent-strong) !important;
+    background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important;
     color: white !important;
     border: none !important;
     border-radius: 8px !important;
-    font-weight: 600 !important;
+    font-weight: 700 !important;
     padding: 0.5rem 1rem !important;
 }
-button[kind="primary"] { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%) !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -270,7 +280,6 @@ def save_json_file(filename, data):
     except Exception as e:
         st.error(f"저장 실패: {e}")
 
-# KST (한국 표준시) 구하기
 def get_kst_now_str():
     kst = pytz.timezone('Asia/Seoul')
     return datetime.now(kst).strftime("%Y-%m-%d %H:%M")
@@ -417,7 +426,6 @@ def get_fallback_expert_analysis(t: str, delta_pct: float, rsi: float, mdd: floa
     return default_reason, default_view
 
 def format_ai_content_to_html(text: str) -> str:
-    """ AI가 생성한 텍스트를 보기 좋게 HTML 박스와 줄바꿈 구조로 정돈하는 가공 함수 """
     if not text:
         return ""
     
@@ -430,14 +438,11 @@ def format_ai_content_to_html(text: str) -> str:
             formatted_lines.append("<br>")
             continue
             
-        # 마크다운 강조를 <b> 태그로 변환
         line_str = line_str.replace("**", "<b>").replace("**", "</b>")
         
-        # '• ' 로 시작하는 주제 제목은 배지 형태로 포맷팅
         if line_str.startswith("•") or line_str.startswith("*"):
             title_text = line_str.lstrip("•* ").strip()
             formatted_lines.append(f'<div class="sub-badge">{title_text}</div>')
-        # '- ' 로 시작하는 항목은 서브 리스트 형태로 간격 조정
         elif line_str.startswith("-"):
             item_text = line_str.lstrip("- ").strip()
             formatted_lines.append(f'<div class="sub-item">• {item_text}</div>')
@@ -450,7 +455,6 @@ def get_chart_analysis_with_1hr_cache(t: str, cur_price: float, delta_pct: float
     cache = st.session_state["chart_analysis_cache"]
     now_ts = time.time()
     
-    # 1시간(3600초) 지남 여부 체크
     if not force_refresh and t in cache:
         item = cache[t]
         last_ts = item.get("timestamp", 0)
@@ -517,9 +521,14 @@ with st.sidebar:
     model_name = st.text_input("Gemini 모델명 (기본: 자동 탐색)", value="auto")
 
 # =========================================================
-# [7] 메인 타이틀 & 종목 선택
+# [7] 메인 타이틀 배너 (이미지 디자인 완벽 반영)
 # =========================================================
-st.markdown('<div class="title-banner">📈 AI 텐배거 발굴기 Pro</div>', unsafe_allow_html=True)
+st.markdown("""
+<div class="title-banner-container">
+    <div class="title-main-text">AI 주식 투자분석</div>
+    <div class="title-sub-text">AI Stock Investment Analysis</div>
+</div>
+""", unsafe_allow_html=True)
 
 selected_index = st.session_state["watchlist"].index(st.session_state["current_ticker"]) if st.session_state["current_ticker"] in st.session_state["watchlist"] else 0
 
@@ -612,7 +621,6 @@ with tab1:
 
         st.markdown("---")
         
-        # 💡 [버튼 및 타이틀 레이아웃]
         st.markdown(f'<div class="section-title">📊 {ticker} 입체 주가 분석</div>', unsafe_allow_html=True)
         force_run = st.button("🔄 AI 즉시 수동 재분석", type="primary", use_container_width=True)
 
@@ -726,13 +734,14 @@ with tab3:
         st.markdown(item["content"])
 
 # ========================================================
-# TAB 4: 일지
+# TAB 4: 일지 (수정/삭제 시 즉시 자동 저장 구조)
 # ========================================================
 with tab4:
     def load_journal():
         if os.path.exists(JOURNAL_FILE):
             df = pd.read_csv(JOURNAL_FILE)
-            if "ID" not in df.columns: df.insert(0, "ID", [uuid.uuid4().hex[:8] for _ in range(len(df))])
+            if "ID" not in df.columns: 
+                df.insert(0, "ID", [uuid.uuid4().hex[:8] for _ in range(len(df))])
             df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
             return df
         return pd.DataFrame(columns=JOURNAL_COLUMNS)
@@ -755,7 +764,8 @@ with tab4:
 
     df_journal = load_journal()
     if not df_journal.empty:
-        st.caption("💡 표 체크박스로 행을 선택한 후 우측 상단 🗑️ 아이콘을 누르면 삭제됩니다.")
+        st.caption("💡 수정 및 삭제는 화면에서 행을 편집/삭제하는 즉시 자동 저장됩니다.")
+        
         edited_df = st.data_editor(
             df_journal[df_journal["Ticker"] == ticker], 
             num_rows="dynamic", 
@@ -763,7 +773,11 @@ with tab4:
             key="j_editor",
             column_config={"ID": st.column_config.TextColumn(disabled=True)}
         )
-        if st.button("💾 저장", use_container_width=True):
-            other_rows = df_journal[df_journal["Ticker"] != ticker]
-            save_journal(pd.concat([other_rows, edited_df], ignore_index=True))
+        
+        # 수정/삭제 자동 반영 로직
+        other_rows = df_journal[df_journal["Ticker"] != ticker]
+        current_combined = pd.concat([other_rows, edited_df], ignore_index=True)
+        
+        if not current_combined.equals(df_journal):
+            save_journal(current_combined)
             st.rerun()
