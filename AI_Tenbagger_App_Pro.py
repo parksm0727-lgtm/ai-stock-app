@@ -74,7 +74,6 @@ html, body, .stApp, [data-testid="stSidebar"], [data-testid="stHeader"] {
 }
 h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
-/* 💡 화면 하단 Manage app 버튼에 가려지지 않도록 패딩 대폭 추가 */
 .block-container {
     padding-top: 3.5rem !important;
     padding-bottom: 5.5rem !important;
@@ -105,7 +104,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     box-sizing: border-box !important;
 }
 
-/* 💡 분석 섹션 타이틀: 무조건 한 줄 + 아래 박스와 겹침 방지 여백 부여 */
+/* 분석 섹션 타이틀 */
 .section-title {
     font-size: clamp(0.9rem, 4.2vw, 1.3rem) !important;
     font-weight: 700 !important;
@@ -120,7 +119,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     line-height: 1.4 !important;
 }
 
-/* 💡 분석 내용 카드 스타일 */
+/* 분석 내용 카드 스타일 */
 .analysis-card {
     background-color: var(--surface);
     border: 1px solid var(--border);
@@ -263,7 +262,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & AI 호출
+# [5] 데이터 로딩 & AI 호출 (안전한 모델 선택 로직)
 # =========================================================
 @st.cache_data(ttl=300, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -294,35 +293,57 @@ def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
     m.fit(df_train)
     return m.predict(m.make_future_dataframe(periods=years * 365))
 
-def get_best_available_model(client: genai.Client) -> str:
+# 💡 계정에서 사용 가능한 유효한 Gemini 모델만 자동 매칭
+def get_valid_models(client: genai.Client) -> list:
+    valid_list = []
     try:
-        models = [m.name for m in client.models.list() if "generateContent" in (m.supported_actions or [])]
-        for m_name in models:
-            clean_name = m_name.replace("models/", "")
-            if "flash" in clean_name and ("3.7" in clean_name or "3.6" in clean_name or "3.0" in clean_name):
-                return clean_name
-        for m_name in models:
-            clean_name = m_name.replace("models/", "")
-            if "flash" in clean_name:
-                return clean_name
+        all_models = client.models.list()
+        for m in all_models:
+            name = m.name.replace("models/", "")
+            actions = getattr(m, 'supported_actions', []) or []
+            if "generateContent" in actions or not actions:
+                valid_list.append(name)
     except Exception:
         pass
-    return "gemini-1.5-flash"
+    
+    # 최신 우선 순서 정렬
+    priority_keywords = ["3.7", "3.6", "3.0", "2.0", "flash"]
+    sorted_models = []
+    for kw in priority_keywords:
+        for m_name in valid_list:
+            if kw in m_name and m_name not in sorted_models:
+                sorted_models.append(m_name)
+    
+    for m_name in valid_list:
+        if m_name not in sorted_models:
+            sorted_models.append(m_name)
+            
+    # 기본 안전 폴백 추가 (404 예외 모델 제거)
+    fallback_defaults = ["gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro"]
+    for fb in fallback_defaults:
+        if fb not in sorted_models:
+            sorted_models.append(fb)
+            
+    return sorted_models
 
 def get_ai_text(api_key: str, preferred_model: str, prompt: str) -> str:
     client = genai.Client(api_key=api_key)
-    best_model = get_best_available_model(client)
+    candidate_models = get_valid_models(client)
     
-    target_models = list(dict.fromkeys([best_model, preferred_model, "gemini-1.5-flash"]))
+    if preferred_model and preferred_model != "auto" and preferred_model not in candidate_models:
+        candidate_models.insert(0, preferred_model)
+        
     last_err = None
-    for m in target_models:
-        if not m: continue
+    for model_id in candidate_models:
         try:
-            return client.models.generate_content(model=m, contents=prompt).text
+            res = client.models.generate_content(model=model_id, contents=prompt)
+            if res and res.text:
+                return res.text
         except Exception as e:
             last_err = e
             continue
-    raise last_err
+            
+    raise last_err or RuntimeError("사용 가능한 Gemini AI 모델을 찾지 못했습니다.")
 
 def get_active_gemini_key(sidebar_key: str) -> str:
     return sidebar_key or os.environ.get("GEMINI_API_KEY", "")
@@ -342,7 +363,7 @@ def generate_chart_analysis(t: str, cur_price: float, delta_pct: float, rsi: flo
             f"[관점]\n"
             f"• 시클리컬 전망: Prophet AI 궤적 및 거시 구조 전망\n"
             f"• 트레이딩 전략: 지지/저항 및 타깃/손절 매매 전략\n\n"
-            f"구체적인 전문 어휘를 사용하여 깔끔한 줄바꿈과 함께 작성하고, 반드시 '[원인]'과 '[관점]' 태그를 지켜주세요."
+            f"구체적인 전문 어휘를 사용하여 작성하고, 반드시 '[원인]'과 '[관점]' 태그를 지켜주세요."
         )
         try:
             res = get_ai_text(api_key, model_n, prompt)
@@ -356,7 +377,6 @@ def generate_chart_analysis(t: str, cur_price: float, delta_pct: float, rsi: flo
         except Exception:
             pass
 
-    # 고도화된 초전문가 다차원 프로필 백업 엔진
     expert_profiles = {
         "ASTS": (
             f"• <b>펀더멘털 & 산업</b>: 저궤도(LEO) Direct-to-Cell 위성 통신망 구축 및 글로벌 MNO(AT&T, Verizon) 파트너십 상용화 기대감이 상방 모멘텀을 이끕니다.<br><br>"
@@ -467,7 +487,7 @@ with st.spinner("최신 주가 데이터 로딩 중..."):
 tab1, tab2, tab3, tab4 = st.tabs(["📈 차트", "🧠 리포트", "🌟 추천", "📝 일지"])
 
 # ========================================================
-# TAB 1: 차트 & 완벽한 여백/레이아웃 분석 카드
+# TAB 1: 차트 분석
 # ========================================================
 with tab1:
     if data.empty:
@@ -522,17 +542,14 @@ with tab1:
         active_key = get_active_gemini_key(api_key_input)
         reason_msg, view_msg = generate_chart_analysis(ticker, current_price, delta_pct, rsi_val, mdd_val, active_key, model_name)
 
-        # 볼드 마크다운 태그 HTML b 태그로 보정
         reason_msg_html = reason_msg.replace("**", "<b>").replace("**", "</b>").replace("\n", "<br>")
         view_msg_html = view_msg.replace("**", "<b>").replace("**", "</b>").replace("\n", "<br>")
 
         trend_desc = "상승 강세" if delta >= 0 else "하락 조정"
         st.markdown("---")
         
-        # 💡 [핵심 1] 섹션 타이틀: 무조건 한 줄 + 위아래 충분한 여백 제공
         st.markdown(f'<div class="section-title">📊 {ticker} 입체 주가 분석 및 시나리오</div>', unsafe_allow_html=True)
         
-        # 💡 [핵심 2] 분석 카드 UI
         st.markdown(f"""
         <div class="analysis-card">
             <div class="analysis-card-title">1. 현재 차트 및 핵심 지표</div>
@@ -576,6 +593,7 @@ with tab2:
                         "content": res_text
                     }
                     save_json_file(REPORT_FILE, st.session_state["ai_report_cache"])
+                    st.rerun()
                 except Exception as e: 
                     st.error(f"오류 발생: {e}")
 
@@ -620,6 +638,7 @@ with tab3:
                         "content": res_text
                     }
                     save_json_file(RECOMMEND_FILE, st.session_state["ai_recommend_cache"])
+                    st.rerun()
                 except Exception as e: 
                     st.error(f"오류 발생: {e}")
 
