@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (4개 탭 가로 균등 분할)
+# [3] 디자인 시스템
 # =========================================================
 st.markdown("""
 <style>
@@ -227,7 +227,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & AI 호출
+# [5] 데이터 로딩 & AI 호출 (최신 모델 실시간 탐색 지원)
 # =========================================================
 @st.cache_data(ttl=300, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -258,10 +258,29 @@ def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
     m.fit(df_train)
     return m.predict(m.make_future_dataframe(periods=years * 365))
 
-# 💡 최신 Gemini 모델 타겟 설정 (구버전 gemini-2.5-flash 완전 제거)
-def get_ai_text(api_key: str, model_name: str, prompt: str) -> str:
+# 💡 현재 API 키에서 이용 가능한 최신 flash 모델 자동 발굴 함수
+def get_best_available_model(client: genai.Client) -> str:
+    try:
+        models = [m.name for m in client.models.list() if "generateContent" in (m.supported_actions or [])]
+        # 최신 버전을 우선순위로 매칭
+        for m_name in models:
+            clean_name = m_name.replace("models/", "")
+            if "flash" in clean_name and ("3.7" in clean_name or "3.6" in clean_name or "3.0" in clean_name):
+                return clean_name
+        for m_name in models:
+            clean_name = m_name.replace("models/", "")
+            if "flash" in clean_name:
+                return clean_name
+    except Exception:
+        pass
+    return "gemini-1.5-flash"
+
+def get_ai_text(api_key: str, preferred_model: str, prompt: str) -> str:
     client = genai.Client(api_key=api_key)
-    target_models = ["gemini-3.6-flash", model_name, "gemini-1.5-flash"]
+    best_model = get_best_available_model(client)
+    
+    # 시도 우선순위: 자동감지 최신모델 -> 사용자가 지정한 모델 -> 기본 fallback
+    target_models = list(dict.fromkeys([best_model, preferred_model, "gemini-1.5-flash"]))
     last_err = None
     for m in target_models:
         if not m: continue
@@ -275,22 +294,22 @@ def get_ai_text(api_key: str, model_name: str, prompt: str) -> str:
 def get_active_gemini_key(sidebar_key: str) -> str:
     return sidebar_key or os.environ.get("GEMINI_API_KEY", "")
 
+# 💡 심층 종목별 전문 맞춤 AI 분석 리포트 생성기
 @st.cache_data(ttl=1800, show_spinner=False)
 def generate_chart_analysis(t: str, cur_price: float, delta_pct: float, rsi: float, mdd: float, api_key: str, model_n: str) -> tuple:
     if api_key:
         prompt = (
-            f"당신은 미주 주식 금융 분석가입니다. 현재 시점 {date.today().year}년 기준 종목 '{t}'를 정밀 분석해주세요.\n"
+            f"당신은 미주 주식 전문 수석 애널리스트입니다. 현재 시점 {date.today().year}년 기준 종목 '{t}'를 분석해주세요.\n"
             f"- 현재가: ${cur_price:.2f} (전일 대비 {delta_pct:+.2f}%)\n"
             f"- RSI(14): {rsi:.0f}, MDD: {mdd:.1f}%\n\n"
             f"다음 두 항목을 각각 구체적이고 전문적인 2~3문장의 한국어 단락으로 작성하세요.\n"
-            f"[원인] {t} 종목의 핵심 기술적 변동 원인 및 기업 고유 모멘텀 이슈\n"
-            f"[관점] Prophet 차트 궤적과 지표 기반 향후 주가 전망 및 트레이딩 전략\n"
-            f"반드시 '[원인]'과 '[관점]' 태그를 포함하여 답변해주세요."
+            f"[원인] {t} 종목의 독자적 사업 모멘텀, 수급 및 수석 애널리스트 관점의 단기 변동 요인\n"
+            f"[관점] Prophet 차트 추세와 지표 수치 기반 향후 주가 전망 및 구체적 매매 전략\n"
+            f"반드시 '[원인]'과 '[관점]' 태그를 포함하여 출력하세요."
         )
         try:
             res = get_ai_text(api_key, model_n, prompt)
-            reason_p = ""
-            view_p = ""
+            reason_p, view_p = "", ""
             for line in res.split("\n"):
                 line_str = line.strip()
                 if "[원인]" in line_str or "원인:" in line_str:
@@ -302,38 +321,39 @@ def generate_chart_analysis(t: str, cur_price: float, delta_pct: float, rsi: flo
         except Exception:
             pass
 
+    # 고유 심층 펀더멘털 백업 엔진
     profiles = {
         "ASTS": (
-            f"저궤도(LEO) Direct-to-Cell 차세대 위성 통신망 구축 및 글로벌 MNO(AT&T, Verizon) 파트너십 상용화 기대감이 핵심 동력입니다. 단기 급등 후 과열 수급을 식히는 차익 실현 물량 소화 단계이며, 기술적으로 50일 이평선 지지력을 시험하는 구간입니다.",
-            f"위성 궤도 배치 및 서비스 개시 촉매에 따른 우상향 확장성이 유효합니다. RSI {rsi:.0f} 수준은 거품이 걷힌 건강한 눌림목을 형성하고 있으므로 핵심 지지선에서 분할 매수 접근이 적합합니다."
+            f"저궤도(LEO) Direct-to-Cell 차세대 위성 통신망 구축 및 글로벌 통신사(AT&T, Verizon) 파트너십 상용화 모멘텀이 핵심입니다. 단기 급등에 따른 차익 실현 물량을 소화하며 기술적으로 주요 이평선 지지력을 검증하는 구간입니다.",
+            f"상업용 위성 궤도 진입 및 서비스 본격화 촉매가 유효합니다. RSI {rsi:.0f} 수준은 과열이 안정화된 지점이므로 주요 기술적 마디가에서 분할 매수로 대응하는 전략이 유리합니다."
         ),
         "OKLO": (
-            f"빅테크 데이터센터 전력 수요 증가에 따른 소형모듈원자로(SMR) 테마 기대감과 NRC 규제 승인 절차가 주가 변동성을 견인하고 있습니다. 최근 급등에 따른 차익 매물 출회와 고연령 수급 이동으로 단기 기술적 조정을 받았습니다.",
-            f"차세대 에너지원의 장기 성장 궤적이 견고하나, 인허가 리스크 및 착공 일정 지연 리스크가 수급에 반영되고 있습니다. RSI {rsi:.0f} 부근에서 바닥 지지대를 다지는 확인 매수 전략이 유효합니다."
+            f"AI 빅테크 데이터센터 전력 공급을 위한 차세대 소형모듈원자로(SMR) 테마 기대감과 NRC 인허가 절차가 주가를 견인하고 있습니다. 성장주 수급 조정과 연계되어 단기 눌림목이 형성된 상태입니다.",
+            f"탄탄한 장기 성장 파이프라인을 보유하고 있으나 단기 규제 승인 일정 변동성에 주의가 필요합니다. RSI {rsi:.0f} 부근의 지지대 형성 확인 후 접근하는 것이 정석입니다."
         ),
         "IONQ": (
-            f"바륨 기반 양자 컴퓨팅 성능 개선과 정부 및 대기업 연계 시스템 공급 계약 모멘텀이 수급의 축을 이룹니다. 성장주 밸류에이션 부담 및 기술주 장세 수급 이탈에 따른 하방 압력으로 추세 하단 테스트가 진행 중입니다.",
-            f"Prophet AI 예측 모델 기준 10년 단위의 기술 개화 모멘텀이 유지됩니다. MDD {mdd:.1f}%는 기술주 특유의 깊은 조정 구간이며, 기술 성과 발표 전 분할 진입이 바람직합니다."
+            f"바륨 기반 양자 컴퓨팅 성능 고도화와 정부 및 산업계 공급 계약 모멘텀이 수급을 받치고 있습니다. 중소형 성장주 밸류에이션 부담에 따른 단기 하방 압력을 받고 있습니다.",
+            f"Prophet AI 예측 궤적상 장기 기술 개화 모멘텀은 견고합니다. MDD {mdd:.1f}%의 조정을 활용해 기술 성과 발표 전 분할 진입하는 전략이 유효합니다."
         ),
         "TSLA": (
-            f"FSD v13 상용화, 로보택시 및 보급형 신차 기대감이 하단을 지지하는 가운데, 분기 인도량 및 AI 칩 수급 이슈로 단기 기술적 박스권 하단 테스트가 이어지고 있습니다.",
-            f"RSI {rsi:.0f} 수준은 수급 과열이 완화된 지점으로, 지수 조정과 연계된 단기 변동성을 활용하여 장기 AI 에코시스템 성장 가치에 기반한 분할 접근이 유효합니다."
+            f"FSD v13 상용화 기대감 및 로보택시 사업화 파이프라인이 하단을 지지하는 가운데, 분기 인도량 및 AI 칩 수급 이슈로 박스권 하단 테스트가 진행되고 있습니다.",
+            f"RSI {rsi:.0f} 수준은 수급 과열이 크게 해소된 구간입니다. 장기 AI 및 자율주행 에코시스템 성장 가치에 기반한 분할 접근을 권장합니다."
         ),
         "RXRX": (
-            f"엔비디아 협력 기반 AI 신약 개발 플랫폼 바이오 테마 및 파이프라인 임상 결과에 민감하게 반응하고 있습니다. 임상 대기 기간 동안의 거래량 소진으로 눌림목이 심화된 형태입니다.",
-            f"바이오 성장주 특성상 높은 변동성을 수반하므로, 핵심 지지선 부근에서 리스크 관리 위주의 분할 진입 전략이 권장됩니다."
+            f"엔비디아 협력 기반 AI 신약 개발 플랫폼 및 파이프라인 임상 데이터 공개 모멘텀에 민감하게 연동됩니다. 임상 결과 대기 기간 동안 거래량이 소진되며 눌림목을 형성하고 있습니다.",
+            f"바이오 성장 특성상 높은 변동성을 동반하므로, 주요 지지선 부근에서 리스크 관리 중심의 타점 잡기가 적합합니다."
         ),
         "PLTR": (
-            f"AIP(인공지능 플랫폼) 중심의 기업형 및 정부향 상업용 매출 고성장이 강력한 기초 체력을 형성하고 있습니다. 고P/E에 따른 밸류에이션 보정 국면에서 차익 실현 물량이 출회되고 있습니다.",
-            f"기업 체질이 지속 강화되고 있어 기관 수급 유입 재개 시 반등 모멘텀이 강하게 작용할 전망입니다. RSI 지표 수치 관찰을 통한 눌림목 타점 잡기가 유효합니다."
+            f"AIP(인공지능 플랫폼) 중심의 상업용 매출 고성장이 강력한 기초 체력을 형성하고 있으나, 높은 P/E 부담에 따른 기관 차익 실현 매물이 출회되고 있습니다.",
+            f"기업 체질이 지속 강화되고 있어 기관 수급 유입 재개 시 강한 기술적 반등이 기대되는 만큼 RSI 지표 관찰을 통한 분할 대응이 좋습니다."
         )
     }
 
     if t in profiles:
         return profiles[t][0], profiles[t][1]
     
-    default_reason = f"{t} 기업 고유의 비즈니스 모멘텀과 기술주 수급 흐름이 주가 변동에 직접 반영되고 있습니다. 최근 전일 대비 {delta_pct:+.2f}%의 수급 움직임을 보이고 있습니다."
-    default_view = f"Prophet 예측 궤적 및 RSI {rsi:.0f} 지표를 감안할 때, 과열이 소화된 상황에서 지지선 확인 후 단계적 분할 접근이 적합합니다."
+    default_reason = f"{t} 기업 고유의 비즈니스 모멘텀과 기술주 수급 흐름이 주가 변동에 직접 반영되고 있습니다. 최근 전일 대비 {delta_pct:+.2f}%의 변동성을 기록했습니다."
+    default_view = f"Prophet 예측 궤적 및 RSI {rsi:.0f} 지표를 감안할 때, 과열이 완화된 지점에서 주요 지지선 확보 후 분할 진입하는 전략이 유효합니다."
     return default_reason, default_view
 
 def render_mini_grid(cards: list):
@@ -352,7 +372,7 @@ def on_ticker_change():
 with st.sidebar:
     st.markdown("### ⚙️ 시스템 설정")
     api_key_input = st.text_input("Gemini API Key", type="password")
-    model_name = st.text_input("Gemini 모델명", value="gemini-3.6-flash")
+    model_name = st.text_input("Gemini 모델명 (기본: 자동 탐색)", value="auto")
 
 # =========================================================
 # [7] 메인 타이틀 & 종목 선택
