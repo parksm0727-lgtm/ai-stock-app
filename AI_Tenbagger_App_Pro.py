@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (상승=빨간색, 하락=파란색 적용)
+# [3] 디자인 시스템
 # =========================================================
 st.markdown("""
 <style>
@@ -62,8 +62,8 @@ st.markdown("""
     --text-muted: #8A94AC;
     --accent: #5B9DF9;
     --accent-strong: #3B82F6;
-    --up: #F87171;    /* 💡 상승: 빨간색 */
-    --down: #60A5FA;  /* 💡 하락: 파란색 */
+    --up: #F87171;    /* 상승: 빨간색 */
+    --down: #60A5FA;  /* 하락: 파란색 */
     --radius: 8px;
 }
 
@@ -84,7 +84,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 [data-testid="stVerticalBlock"] { gap: 0.1rem !important; }
 [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
 
-/* 메인 타이틀 배너 */
+/* 타이틀 배너 */
 .title-banner {
     background: linear-gradient(135deg, #1E293B 0%, #1D4ED8 50%, #3B82F6 100%);
     color: #ffffff;
@@ -333,7 +333,7 @@ with st.spinner("최신 주가 데이터 로딩 중..."):
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 차트", "🧠 리포트", "🎯 목표", "🌟 추천", "📝 일지"])
 
 # ========================================================
-# TAB 1: 차트 & 주가 현황 리포트 (상승=빨강, 하락=파랑)
+# TAB 1: 차트 & 동적 분석 리포트
 # ========================================================
 with tab1:
     if data.empty:
@@ -345,7 +345,6 @@ with tab1:
         delta = current_price - prev_close
         delta_pct = (delta / prev_close * 100) if prev_close else 0.0
         
-        # 💡 상승 시 빨간색(var(--up)), 하락 시 파란색(var(--down)) 적용
         delta_color = "var(--up)" if delta >= 0 else "var(--down)"
         
         st.markdown(
@@ -359,7 +358,6 @@ with tab1:
         rsi_state = "과매수" if rsi_val >= 70 else ("과매도" if rsi_val <= 30 else "중립")
         mdd_val = (data['Close'] / data['Close'].cummax() - 1.0).min() * 100
 
-        # RSI 과매수=빨강, 과매도=파랑 적용
         rsi_tag_color = "var(--up)" if rsi_state == "과매수" else ("var(--down)" if rsi_state == "과매도" else "var(--text-muted)")
 
         render_mini_grid([
@@ -387,7 +385,29 @@ with tab1:
         fig_chart.update_yaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4", size=9))
         st.plotly_chart(fig_chart, use_container_width=True)
 
-        trend_desc = "하락 조정" if delta < 0 else "상승 흐름"
+        # 💡 [핵심] 선택 종목 지표에 따라 동적으로 생성되는 원인 및 전망 문구 생성기
+        trend_desc = "상승 강세" if delta >= 0 else "하락 조정"
+        
+        # 1. 동적 원인 문구 조건 분기
+        if delta >= 0:
+            if rsi_val >= 70:
+                reason_msg = f"{ticker} 종목은 최근 매수세가 강하게 몰리며 RSI {rsi_val:.0f}의 과매수 구간에 진입했습니다. 단기 상승 모멘텀이 유지되고 있으나 단기 차익 실현 유의가 필요합니다."
+            else:
+                reason_msg = f"{ticker} 종목은 바닥권에서 거래량을 동반한 우상향 수급이 유입되며 상승세를 나타내고 있습니다. 안정적인 저점 다지기 후 기술적 반등 흐름입니다."
+        else:
+            if rsi_val <= 30:
+                reason_msg = f"{ticker} 종목은 최근 연속 조정으로 RSI {rsi_val:.0f} 수준의 단기 과매도 구간에 들어섰습니다. 과도한 투매 물량이 나오며 기술적 반등 임계점에 가깝습니다."
+            else:
+                reason_msg = f"{ticker} 종목은 매익 실현 물량 소화 및 기술적 눌림목 형성 과정에 있습니다. 대외 금리 변동성 및 성장주 수급 이동 영향으로 단기 숨고르기를 진행 중입니다."
+
+        # 2. 동적 전망 문구 조건 분기
+        if rsi_val >= 70:
+            view_msg = f"Prophet AI 예측(붉은선)은 장기 우상향 궤적을 제시하지만, RSI {rsi_val:.0f}로 고점 과열 상태입니다. 신규 매수보다는 분할 익절 및 눌림목 자리를 확인하는 전략이 유효합니다."
+        elif rsi_val <= 30:
+            view_msg = f"RSI {rsi_val:.0f} 과매도 저평가 구간으로 기술적 주가 반등 가능성이 높은 지점입니다. 분할 매수 관점의 관망 및 접근이 유효한 타점입니다."
+        else:
+            view_msg = f"Prophet AI 예측(붉은선) 기반 우상향 모멘텀이 유지되는 추세입니다. RSI {rsi_val:.0f}의 중립 수급 상태이므로 지지선 확보 여부를 살피며 접근하시기 바랍니다."
+
         st.markdown("---")
         st.markdown(f"### 📊 {ticker} 주가 분석 및 예측")
         
@@ -398,12 +418,10 @@ with tab1:
 * **52주 고점 대비 낙폭(MDD)**: **{mdd_val:.1f}%**
 
 **2. 주가 변동 원인**
-* 최근 단기 급등에 따른 차익 실현 물량 소화 및 기술적 이평선 눌림목 형성 과정입니다.
-* 기술 성장주 특성상 대외 금리 변동성 및 섹터 이슈에 반응하며 RSI 보조지표가 차분해지는 단기 숨고르기 구간입니다.
+* {reason_msg}
 
 **3. 향후 주가 예측 및 매매 관점**
-* Prophet AI 모델 예측(붉은선)에 따르면 장기 비즈니스 모멘텀 유지 시 우상향 파동 궤적을 그리게 됩니다.
-* RSI {rsi_val:.0f} 수준은 과도한 거품이 빠진 상태이며, 펀더멘털 상용화 악재가 없다면 지지선 확보 후 기술적 반등 시도를 전망합니다.
+* {view_msg}
         """)
 
 # ========================================================
