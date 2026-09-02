@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (무조건 한 줄 타이틀 + 가독성 카드 스타일)
+# [3] 디자인 시스템 (하단 넉넉한 여백 + 타이틀 겹침 차단)
 # =========================================================
 st.markdown("""
 <style>
@@ -74,15 +74,14 @@ html, body, .stApp, [data-testid="stSidebar"], [data-testid="stHeader"] {
 }
 h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
+/* 💡 화면 하단 Manage app 버튼에 가려지지 않도록 패딩 대폭 추가 */
 .block-container {
     padding-top: 3.5rem !important;
-    padding-bottom: 0.5rem !important;
+    padding-bottom: 5.5rem !important;
     padding-left: 0.6rem !important;
     padding-right: 0.6rem !important;
     max-width: 720px !important;
 }
-[data-testid="stVerticalBlock"] { gap: 0.1rem !important; }
-[data-testid="stElementContainer"] { margin-bottom: 0 !important; }
 
 /* 최상단 메인 타이틀 배너 */
 .title-banner {
@@ -106,7 +105,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     box-sizing: border-box !important;
 }
 
-/* 💡 분석 섹션 타이틀: 무조건 한 줄 유지 */
+/* 💡 분석 섹션 타이틀: 무조건 한 줄 + 아래 박스와 겹침 방지 여백 부여 */
 .section-title {
     font-size: clamp(0.9rem, 4.2vw, 1.3rem) !important;
     font-weight: 700 !important;
@@ -114,10 +113,11 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     color: var(--text) !important;
-    margin-top: 12px !important;
-    margin-bottom: 8px !important;
+    margin-top: 18px !important;
+    margin-bottom: 12px !important;
     display: block !important;
     width: 100% !important;
+    line-height: 1.4 !important;
 }
 
 /* 💡 분석 내용 카드 스타일 */
@@ -126,19 +126,19 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 12px 14px;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
 }
 .analysis-card-title {
     font-size: 0.85rem;
     font-weight: 700;
     color: var(--accent);
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     border-bottom: 1px dashed var(--border);
     padding-bottom: 4px;
 }
 .analysis-card-content {
     font-size: 0.82rem;
-    line-height: 1.5;
+    line-height: 1.6;
     color: var(--text);
 }
 
@@ -359,40 +359,40 @@ def generate_chart_analysis(t: str, cur_price: float, delta_pct: float, rsi: flo
     # 고도화된 초전문가 다차원 프로필 백업 엔진
     expert_profiles = {
         "ASTS": (
-            f"• **펀더멘털 & 산업**: 저궤도(LEO) Direct-to-Cell 위성 통신망 구축 및 글로벌 MNO(AT&T, Verizon) 파트너십 상용화 기대감이 상방 모멘텀을 이끕니다.\n\n"
-            f"• **수급 & 퀀트**: 최근 단기 급등 후 과열 수급을 식히는 단계이며, RSI {rsi:.0f} 수치는 50일 이동평균선 근처에서 지지력을 재시험하는 기술적 매물 소화 과정입니다.",
-            f"• **시클리컬 전망**: 상업용 위성 발사 성공 및 주파수 승인 촉매 유효 시 장기 우상향 확장성이 높습니다.\n\n"
-            f"• **트레이딩 전략**: MDD {mdd:.1f}%의 변동성을 고려하여 핵심 지지선 연동 확인 후 리스크 관리 기반 분할 매수 접근이 적합합니다."
+            f"• <b>펀더멘털 & 산업</b>: 저궤도(LEO) Direct-to-Cell 위성 통신망 구축 및 글로벌 MNO(AT&T, Verizon) 파트너십 상용화 기대감이 상방 모멘텀을 이끕니다.<br><br>"
+            f"• <b>수급 & 퀀트</b>: 최근 단기 급등 후 과열 수급을 식히는 단계이며, RSI {rsi:.0f} 수치는 50일 이동평균선 근처에서 지지력을 재시험하는 기술적 매물 소화 과정입니다.",
+            f"• <b>시클리컬 전망</b>: 상업용 위성 발사 성공 및 주파수 승인 촉매 유효 시 장기 우상향 확장성이 높습니다.<br><br>"
+            f"• <b>트레이딩 전략</b>: MDD {mdd:.1f}%의 변동성을 고려하여 핵심 지지선 연동 확인 후 리스크 관리 기반 분할 매수 접근이 적합합니다."
         ),
         "OKLO": (
-            f"• **펀더멘털 & 산업**: AI 빅테크 데이터센터 전력 공급을 위한 차세대 소형모듈원자로(SMR) 테마 수혜주로 NRC 규제 승인 이슈가 핵심 변수입니다.\n\n"
-            f"• **수급 & 퀀트**: 성장주 수급 이동과 연계된 단기 조정으로, RSI {rsi:.0f} 지표는 기간 조정을 통한 기술적 매물대 다지기를 나타냅니다.",
-            f"• **시클리컬 전망**: 2030년 전력 공급 개시 전까지 인허가 뉴스 흐름에 따른 변동성 국면이 이어질 전망입니다.\n\n"
-            f"• **트레이딩 전략**: 하방 지지선 연동 확인 후 단기 매물대 돌파 여부에 맞춰 분할 진입하는 전략이 유효합니다."
+            f"• <b>펀더멘털 & 산업</b>: AI 빅테크 데이터센터 전력 공급을 위한 차세대 소형모듈원자로(SMR) 테마 수혜주로 NRC 규제 승인 이슈가 핵심 변수입니다.<br><br>"
+            f"• <b>수급 & 퀀트</b>: 성장주 수급 이동과 연계된 단기 조정으로, RSI {rsi:.0f} 지표는 기간 조정을 통한 기술적 매물대 다지기를 나타냅니다.",
+            f"• <b>시클리컬 전망</b>: 2030년 전력 공급 개시 전까지 인허가 뉴스 흐름에 따른 변동성 국면이 이어질 전망입니다.<br><br>"
+            f"• <b>트레이딩 전략</b>: 하방 지지선 연동 확인 후 단기 매물대 돌파 여부에 맞춰 분할 진입하는 전략이 유효합니다."
         ),
         "IONQ": (
-            f"• **펀더멘털 & 산업**: 바륨 기반 이온트랩 양자 컴퓨팅 성능 고도화와 정부/기업 공급 계약 확대가 중장기 기초 체력을 형성합니다.\n\n"
-            f"• **수급 & 퀀트**: 성장주 장세의 리스크 오프 기조에 따라 MDD {mdd:.1f}%를 기록 중이며, RSI {rsi:.0f} 수준은 하방 압력이 완화된 구간입니다.",
-            f"• **시클리컬 전망**: Prophet 모델 기반 우상향 궤적을 그리나 기술 상용화까지 장기 파동 특성을 보입니다.\n\n"
-            f"• **트레이딩 전략**: 주요 학회 성과 공개 및 실적 모멘텀 전 분할 매수로 접근하는 전략이 바람직합니다."
+            f"• <b>펀더멘털 & 산업</b>: 바륨 기반 이온트랩 양자 컴퓨팅 성능 고도화와 정부/기업 공급 계약 확대가 중장기 기초 체력을 형성합니다.<br><br>"
+            f"• <b>수급 & 퀀트</b>: 성장주 장세의 리스크 오프 기조에 따라 MDD {mdd:.1f}%를 기록 중이며, RSI {rsi:.0f} 수준은 하방 압력이 완화된 구간입니다.",
+            f"• <b>시클리컬 전망</b>: Prophet 모델 기반 우상향 궤적을 그리나 기술 상용화까지 장기 파동 특성을 보입니다.<br><br>"
+            f"• <b>트레이딩 전략</b>: 주요 학회 성과 공개 및 실적 모멘텀 전 분할 매수로 접근하는 전략이 바람직합니다."
         ),
         "TSLA": (
-            f"• **펀더멘털 & 산업**: FSD v13 상용화, 로보택시 및 보급형 신차 투입 기대감이 하단을 방어하고 있습니다.\n\n"
-            f"• **수급 & 퀀트**: 분기 인도량 및 AI 칩 수급 이슈로 차익 매물이 출회되었으며, RSI {rsi:.0f} 지표는 박스권 하단 수급 탐색 상태입니다.",
-            f"• **시클리컬 전망**: 자율주행 소프트웨어 라이선싱 매출 가시화 시 강한 멀티플 재평가가 기대됩니다.\n\n"
-            f"• **트레이딩 전략**: 단기 변동성을 활용하여 기술적 지지대 진입 시 분할 접근하는 전략이 권장됩니다."
+            f"• <b>펀더멘털 & 산업</b>: FSD v13 상용화, 로보택시 및 보급형 신차 투입 기대감이 하단을 방어하고 있습니다.<br><br>"
+            f"• <b>수급 & 퀀트</b>: 분기 인도량 및 AI 칩 수급 이슈로 차익 매물이 출회되었으며, RSI {rsi:.0f} 지표는 박스권 하단 수급 탐색 상태입니다.",
+            f"• <b>시클리컬 전망</b>: 자율주행 소프트웨어 라이선싱 매출 가시화 시 강한 멀티플 재평가가 기대됩니다.<br><br>"
+            f"• <b>트레이딩 전략</b>: 단기 변동성을 활용하여 기술적 지지대 진입 시 분할 접근하는 전략이 권장됩니다."
         ),
         "RXRX": (
-            f"• **펀더멘털 & 산업**: 엔비디아 협력 기반 AI 신약 개발 플랫폼 및 파이프라인 임상 데이터공개 이슈가 핵심 모멘텀입니다.\n\n"
-            f"• **수급 & 퀀트**: 임상 결과 발표 전 거래량 소진으로 눌림목이 심화되었으며, RSI {rsi:.0f} 지표는 하방 리스크가 반영된 수준입니다.",
-            f"• **시클리컬 전망**: 임상 진행 경과에 따른 바이오 특유의 갭상승/하락 파동이 예상됩니다.\n\n"
-            f"• **트레이딩 전략**: 단기 급등 시 차익 실현과 하단 분할 매수 상호 전략을 적용하는 포트폴리오 관리가 필요합니다."
+            f"• <b>펀더멘털 & 산업</b>: 엔비디아 협력 기반 AI 신약 개발 플랫폼 및 파이프라인 임상 데이터공개 이슈가 핵심 모멘텀입니다.<br><br>"
+            f"• <b>수급 & 퀀트</b>: 임상 결과 발표 전 거래량 소진으로 눌림목이 심화되었으며, RSI {rsi:.0f} 지표는 하방 리스크가 반영된 수준입니다.",
+            f"• <b>시클리컬 전망</b>: 임상 진행 경과에 따른 바이오 특유의 갭상승/하락 파동이 예상됩니다.<br><br>"
+            f"• <b>트레이딩 전략</b>: 단기 급등 시 차익 실현과 하단 분할 매수 상호 전략을 적용하는 포트폴리오 관리가 필요합니다."
         ),
         "PLTR": (
-            f"• **펀더멘털 & 산업**: AIP(인공지능 플랫폼) 고성장에 따른 상업용 매출 급증이 펀더멘털의 강력한 견인차입니다.\n\n"
-            f"• **수급 & 퀀트**: 높은 멀티플 부담으로 인한 기관 차익 실현 물량이 출회되었으나 기초 체력은 견고합니다.",
-            f"• **시클리컬 전망**: AI 엔터프라이즈 전환 주도기업으로서 밸류에이션 보정 완료 후 지속적 우상향 추세가 유효합니다.\n\n"
-            f"• **트레이딩 전략**: RSI 지표 기반 눌림목 발생 시 지지선 확인 후 포지션을 단계적으로 확대하는 것이 권장됩니다."
+            f"• <b>펀더멘털 & 산업</b>: AIP(인공지능 플랫폼) 고성장에 따른 상업용 매출 급증이 펀더멘털의 강력한 견인차입니다.<br><br>"
+            f"• <b>수급 & 퀀트</b>: 높은 멀티플 부담으로 인한 기관 차익 실현 물량이 출회되었으나 기초 체력은 견고합니다.",
+            f"• <b>시클리컬 전망</b>: AI 엔터프라이즈 전환 주도기업으로서 밸류에이션 보정 완료 후 지속적 우상향 추세가 유효합니다.<br><br>"
+            f"• <b>트레이딩 전략</b>: RSI 지표 기반 눌림목 발생 시 지지선 확인 후 포지션을 단계적으로 확대하는 것이 권장됩니다."
         )
     }
 
@@ -400,12 +400,12 @@ def generate_chart_analysis(t: str, cur_price: float, delta_pct: float, rsi: flo
         return expert_profiles[t][0], expert_profiles[t][1]
     
     default_reason = (
-        f"• **펀더멘털 & 산업**: {t} 기업 고유의 비즈니스 모멘텀과 기술주 수급 흐름이 주가 변동에 직접 반영되는 국면입니다.\n\n"
-        f"• **수급 & 퀀트**: 전일 대비 {delta_pct:+.2f}% 변동 속에 RSI {rsi:.0f} 수치는 기술적 수급 균형점을 탐색 중입니다."
+        f"• <b>펀더멘털 & 산업</b>: {t} 기업 고유의 비즈니스 모멘텀과 기술주 수급 흐름이 주가 변동에 직접 반영되는 국면입니다.<br><br>"
+        f"• <b>수급 & 퀀트</b>: 전일 대비 {delta_pct:+.2f}% 변동 속에 RSI {rsi:.0f} 수치는 기술적 수급 균형점을 탐색 중입니다."
     )
     default_view = (
-        f"• **시클리컬 전망**: Prophet 예측 궤적상 중장기 방향성은 유지되며 지수 환경 영향을 수반합니다.\n\n"
-        f"• **트레이딩 전략**: 주요 마디가 지지 여부를 확인 후 위험 대비 보상 비율을 고려한 분할 접근이 적합합니다."
+        f"• <b>시클리컬 전망</b>: Prophet 예측 궤적상 중장기 방향성은 유지되며 지수 환경 영향을 수반합니다.<br><br>"
+        f"• <b>트레이딩 전략</b>: 주요 마디가 지지 여부를 확인 후 위험 대비 보상 비율을 고려한 분할 접근이 적합합니다."
     )
     return default_reason, default_view
 
@@ -467,7 +467,7 @@ with st.spinner("최신 주가 데이터 로딩 중..."):
 tab1, tab2, tab3, tab4 = st.tabs(["📈 차트", "🧠 리포트", "🌟 추천", "📝 일지"])
 
 # ========================================================
-# TAB 1: 차트 & 초전문가 가독성 카드 분석
+# TAB 1: 차트 & 완벽한 여백/레이아웃 분석 카드
 # ========================================================
 with tab1:
     if data.empty:
@@ -522,13 +522,17 @@ with tab1:
         active_key = get_active_gemini_key(api_key_input)
         reason_msg, view_msg = generate_chart_analysis(ticker, current_price, delta_pct, rsi_val, mdd_val, active_key, model_name)
 
+        # 볼드 마크다운 태그 HTML b 태그로 보정
+        reason_msg_html = reason_msg.replace("**", "<b>").replace("**", "</b>").replace("\n", "<br>")
+        view_msg_html = view_msg.replace("**", "<b>").replace("**", "</b>").replace("\n", "<br>")
+
         trend_desc = "상승 강세" if delta >= 0 else "하락 조정"
         st.markdown("---")
         
-        # 💡 [핵심 1] 섹션 타이틀: 무조건 한 줄 유지 CSS 클래스 적용
+        # 💡 [핵심 1] 섹션 타이틀: 무조건 한 줄 + 위아래 충분한 여백 제공
         st.markdown(f'<div class="section-title">📊 {ticker} 입체 주가 분석 및 시나리오</div>', unsafe_allow_html=True)
         
-        # 💡 [핵심 2] 분석 내용: 가독성 높은 카드형 UI로 분리
+        # 💡 [핵심 2] 분석 카드 UI
         st.markdown(f"""
         <div class="analysis-card">
             <div class="analysis-card-title">1. 현재 차트 및 핵심 지표</div>
@@ -541,12 +545,12 @@ with tab1:
 
         <div class="analysis-card">
             <div class="analysis-card-title">2. 다차원 변동 원인 분석</div>
-            <div class="analysis-card-content">{reason_msg.replace('\n', '<br>')}</div>
+            <div class="analysis-card-content">{reason_msg_html}</div>
         </div>
 
         <div class="analysis-card">
             <div class="analysis-card-title">3. 향후 주가 예측 및 트레이딩 관점</div>
-            <div class="analysis-card-content">{view_msg.replace('\n', '<br>')}</div>
+            <div class="analysis-card-content">{view_msg_html}</div>
         </div>
         """, unsafe_allow_html=True)
 
