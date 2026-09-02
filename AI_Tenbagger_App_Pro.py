@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (메인 타이틀 좌우 꽉 차는 풀배너)
+# [3] 디자인 시스템 (상승=빨간색, 하락=파란색 적용)
 # =========================================================
 st.markdown("""
 <style>
@@ -62,8 +62,8 @@ st.markdown("""
     --text-muted: #8A94AC;
     --accent: #5B9DF9;
     --accent-strong: #3B82F6;
-    --up: #34D399;
-    --down: #F87171;
+    --up: #F87171;    /* 💡 상승: 빨간색 */
+    --down: #60A5FA;  /* 💡 하락: 파란색 */
     --radius: 8px;
 }
 
@@ -84,7 +84,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 [data-testid="stVerticalBlock"] { gap: 0.1rem !important; }
 [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
 
-/* 💡 메인 타이틀 배너: 좌우 꽉 채움 + 무조건 한 줄 반응형 */
+/* 메인 타이틀 배너 */
 .title-banner {
     background: linear-gradient(135deg, #1E293B 0%, #1D4ED8 50%, #3B82F6 100%);
     color: #ffffff;
@@ -333,7 +333,7 @@ with st.spinner("최신 주가 데이터 로딩 중..."):
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 차트", "🧠 리포트", "🎯 목표", "🌟 추천", "📝 일지"])
 
 # ========================================================
-# TAB 1: 차트 & 주가 현황 리포트
+# TAB 1: 차트 & 주가 현황 리포트 (상승=빨강, 하락=파랑)
 # ========================================================
 with tab1:
     if data.empty:
@@ -345,10 +345,13 @@ with tab1:
         delta = current_price - prev_close
         delta_pct = (delta / prev_close * 100) if prev_close else 0.0
         
+        # 💡 상승 시 빨간색(var(--up)), 하락 시 파란색(var(--down)) 적용
+        delta_color = "var(--up)" if delta >= 0 else "var(--down)"
+        
         st.markdown(
             f'<div class="hero-price"><div class="hero-label">{ticker} 최신가</div>'
             f'<div class="hero-value">${current_price:,.2f}</div>'
-            f'<div class="hero-delta" style="color:{"var(--up)" if delta >= 0 else "var(--down)"};">{"▲" if delta >= 0 else "▼"} {abs(delta):,.2f} ({abs(delta_pct):.2f}%)</div></div>',
+            f'<div class="hero-delta" style="color:{delta_color};">{"▲" if delta >= 0 else "▼"} {abs(delta):,.2f} ({abs(delta_pct):.2f}%)</div></div>',
             unsafe_allow_html=True,
         )
 
@@ -356,8 +359,11 @@ with tab1:
         rsi_state = "과매수" if rsi_val >= 70 else ("과매도" if rsi_val <= 30 else "중립")
         mdd_val = (data['Close'] / data['Close'].cummax() - 1.0).min() * 100
 
+        # RSI 과매수=빨강, 과매도=파랑 적용
+        rsi_tag_color = "var(--up)" if rsi_state == "과매수" else ("var(--down)" if rsi_state == "과매도" else "var(--text-muted)")
+
         render_mini_grid([
-            {"label": "RSI(14)", "value": f"{rsi_val:.0f}", "tag": rsi_state, "tag_color": "var(--down)" if rsi_state == "과매수" else ("var(--up)" if rsi_state == "과매도" else "var(--text-muted)")},
+            {"label": "RSI(14)", "value": f"{rsi_val:.0f}", "tag": rsi_state, "tag_color": rsi_tag_color},
             {"label": "MDD", "value": f"{mdd_val:.1f}%"},
             {"label": "52주 최고가", "value": f"${data['Close'].tail(252).max():,.1f}"},
         ])
