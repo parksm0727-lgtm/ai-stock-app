@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템
+# [3] 디자인 시스템 (무조건 한 줄 타이틀 + 가독성 카드 스타일)
 # =========================================================
 st.markdown("""
 <style>
@@ -84,7 +84,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 [data-testid="stVerticalBlock"] { gap: 0.1rem !important; }
 [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
 
-/* 타이틀 배너 */
+/* 최상단 메인 타이틀 배너 */
 .title-banner {
     background: linear-gradient(135deg, #1E293B 0%, #1D4ED8 50%, #3B82F6 100%);
     color: #ffffff;
@@ -104,6 +104,42 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     border: 1.5px solid #38BDF8;
     line-height: 1.2 !important;
     box-sizing: border-box !important;
+}
+
+/* 💡 분석 섹션 타이틀: 무조건 한 줄 유지 */
+.section-title {
+    font-size: clamp(0.9rem, 4.2vw, 1.3rem) !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    color: var(--text) !important;
+    margin-top: 12px !important;
+    margin-bottom: 8px !important;
+    display: block !important;
+    width: 100% !important;
+}
+
+/* 💡 분석 내용 카드 스타일 */
+.analysis-card {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 8px;
+}
+.analysis-card-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 6px;
+    border-bottom: 1px dashed var(--border);
+    padding-bottom: 4px;
+}
+.analysis-card-content {
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--text);
 }
 
 .hero-price {
@@ -291,7 +327,7 @@ def get_ai_text(api_key: str, preferred_model: str, prompt: str) -> str:
 def get_active_gemini_key(sidebar_key: str) -> str:
     return sidebar_key or os.environ.get("GEMINI_API_KEY", "")
 
-# 💡 초전문가용 다차원 주가 분석 알고리즘 (4대 분석 관점 통합)
+# 💡 초전문가용 다차원 주가 분석 알고리즘
 @st.cache_data(ttl=1800, show_spinner=False)
 def generate_chart_analysis(t: str, cur_price: float, delta_pct: float, rsi: float, mdd: float, api_key: str, model_n: str) -> tuple:
     if api_key:
@@ -301,12 +337,12 @@ def generate_chart_analysis(t: str, cur_price: float, delta_pct: float, rsi: flo
             f"- RSI(14): {rsi:.0f}, MDD: {mdd:.1f}%\n\n"
             f"다음 2가지 구조로 다방면의 초전문가적 분석 결과를 작성하세요.\n\n"
             f"[원인]\n"
-            f"1) 펀더멘털/산업 모멘텀: {t}의 핵심 기술 경쟁력, 매출 성장 및 섹터 모멘텀 이슈\n"
-            f"2) 수급 및 퀀트 지표: 기술적 파동, RSI {rsi:.0f} 및 고점 대비 낙폭({mdd:.1f}%) 수급 소화 메커니즘\n\n"
+            f"• 펀더멘털 & 산업: {t}의 핵심 기술 경쟁력 및 사업 성장 이슈\n"
+            f"• 수급 & 퀀트: 기술적 파동 및 RSI({rsi:.0f}), MDD({mdd:.1f}%) 수급 메커니즘\n\n"
             f"[관점]\n"
-            f"1) Prophet AI 예측 및 시클리컬 전망: 중장기 궤적과 거시 경제 영향\n"
-            f"2) 트레이딩 시나리오: 핵심 지지/저항 라인 중심의 목표가/손절가 및 분할 진입 전략\n\n"
-            f"구체적이고 통찰력 있는 금융 어휘를 사용하여 각 항목을 작성하고, 반드시 '[원인]'과 '[관점]' 태그를 지켜주세요."
+            f"• 시클리컬 전망: Prophet AI 궤적 및 거시 구조 전망\n"
+            f"• 트레이딩 전략: 지지/저항 및 타깃/손절 매매 전략\n\n"
+            f"구체적인 전문 어휘를 사용하여 깔끔한 줄바꿈과 함께 작성하고, 반드시 '[원인]'과 '[관점]' 태그를 지켜주세요."
         )
         try:
             res = get_ai_text(api_key, model_n, prompt)
@@ -320,43 +356,43 @@ def generate_chart_analysis(t: str, cur_price: float, delta_pct: float, rsi: flo
         except Exception:
             pass
 
-    # 💡 고도화된 초전문가 다차원 프로필 백업 엔진
+    # 고도화된 초전문가 다차원 프로필 백업 엔진
     expert_profiles = {
         "ASTS": (
-            f"• **펀더멘털 & 산업**: 저궤도(LEO) Direct-to-Cell 위성 통신망 구축 및 글로벌 MNO(AT&T, Verizon)와의 독점적 파트너십 상용화 모멘텀이 상방 모멘텀을 주도합니다.\n"
-            f"• **수급 & 퀀트**: 최근 급등에 따른 차익 실현 물량이 소화되는 수급 조정 단계이며, RSI {rsi:.0f} 지표는 과열이 해소되어 50일 이동평균선 지지력을 재시험하는 기술적 횡보 구간입니다.",
-            f"• **시클리컬 전망**: 상업용 위성 발사 성공 및 주파수 승인 촉매 유효시 우상향 파동 재개가 예상됩니다.\n"
-            f"• **트레이딩 전략**: MDD {mdd:.1f}% 수준의 변동성을 감안하여, 주요 이평선 지지 확인 후 손절 라인 제한 방식의 단계적 분할 매수 전략이 정석입니다."
+            f"• **펀더멘털 & 산업**: 저궤도(LEO) Direct-to-Cell 위성 통신망 구축 및 글로벌 MNO(AT&T, Verizon) 파트너십 상용화 기대감이 상방 모멘텀을 이끕니다.\n\n"
+            f"• **수급 & 퀀트**: 최근 단기 급등 후 과열 수급을 식히는 단계이며, RSI {rsi:.0f} 수치는 50일 이동평균선 근처에서 지지력을 재시험하는 기술적 매물 소화 과정입니다.",
+            f"• **시클리컬 전망**: 상업용 위성 발사 성공 및 주파수 승인 촉매 유효 시 장기 우상향 확장성이 높습니다.\n\n"
+            f"• **트레이딩 전략**: MDD {mdd:.1f}%의 변동성을 고려하여 핵심 지지선 연동 확인 후 리스크 관리 기반 분할 매수 접근이 적합합니다."
         ),
         "OKLO": (
-            f"• **펀더멘털 & 산업**: 빅테크 AI 데이터센터의 전력 수요 급증에 대응하는 차세대 소형모듈원자로(SMR) 테마 수혜주로, NRC 인허가 절차 진행 상황이 핵심 밸류에이션 변수입니다.\n"
-            f"• **수급 & 퀀트**: 고P/E 성장주 수급 이동과 연계된 단기 조정으로, 전일대비 {delta_pct:+.2f}% 변동과 RSI {rsi:.0f} 지표는 기간 조정을 통한 기술적 마디가 형성 과정입니다.",
-            f"• **시클리컬 전망**: 2030년 전력 공급 개시 전까지 인허가 뉴스 흐름에 따른 변동성 국면이 지속될 전망입니다.\n"
-            f"• **트레이딩 전략**: 하방 지지선 연동 확인 후 단기 매물대 돌파 여부에 따라 목표가를 상향하는 관망 후 분할 진입이 권장됩니다."
+            f"• **펀더멘털 & 산업**: AI 빅테크 데이터센터 전력 공급을 위한 차세대 소형모듈원자로(SMR) 테마 수혜주로 NRC 규제 승인 이슈가 핵심 변수입니다.\n\n"
+            f"• **수급 & 퀀트**: 성장주 수급 이동과 연계된 단기 조정으로, RSI {rsi:.0f} 지표는 기간 조정을 통한 기술적 매물대 다지기를 나타냅니다.",
+            f"• **시클리컬 전망**: 2030년 전력 공급 개시 전까지 인허가 뉴스 흐름에 따른 변동성 국면이 이어질 전망입니다.\n\n"
+            f"• **트레이딩 전략**: 하방 지지선 연동 확인 후 단기 매물대 돌파 여부에 맞춰 분할 진입하는 전략이 유효합니다."
         ),
         "IONQ": (
-            f"• **펀더멘털 & 산업**: 바륨 기반 이온트랩 양자 컴퓨팅 알고리즘 성과 및 정부/기업 공급 계약 확대가 중장기 펀더멘털의 핵심 축을 구성합니다.\n"
-            f"• **수급 & 퀀트**: 성장주 장세의 리스크 오프 기조에 따른 매물 출회로 MDD {mdd:.1f}%를 기록 중이며, RSI {rsi:.0f} 수준은 하방 압력이 완화된 기술적 저점 다지기 상태입니다.",
-            f"• **시클리컬 전망**: Prophet 모델 기반 우상향 궤적을 그리나, 양자 기술 상용화 시점까지 장기 파동 특성을 보입니다.\n"
-            f"• **트레이딩 전략**: 실적 발표 및 주요 학회 성과 공개 전 리스크 관리를 병행한 모아가는 분할 매수 접근이 적합합니다."
+            f"• **펀더멘털 & 산업**: 바륨 기반 이온트랩 양자 컴퓨팅 성능 고도화와 정부/기업 공급 계약 확대가 중장기 기초 체력을 형성합니다.\n\n"
+            f"• **수급 & 퀀트**: 성장주 장세의 리스크 오프 기조에 따라 MDD {mdd:.1f}%를 기록 중이며, RSI {rsi:.0f} 수준은 하방 압력이 완화된 구간입니다.",
+            f"• **시클리컬 전망**: Prophet 모델 기반 우상향 궤적을 그리나 기술 상용화까지 장기 파동 특성을 보입니다.\n\n"
+            f"• **트레이딩 전략**: 주요 학회 성과 공개 및 실적 모멘텀 전 분할 매수로 접근하는 전략이 바람직합니다."
         ),
         "TSLA": (
-            f"• **펀더멘털 & 산업**: FSD v13 상용화, 로보택시 및 2만 달러대 보급형 플랫폼 투입 기대감이 밸류에이션 하단을 강력히 방어하고 있습니다.\n"
-            f"• **수급 & 퀀트**: 분기 인도량 수치 및 AI 칩 수급 이슈로 전일 {delta_pct:+.2f}% 조정을 나타냈으며, RSI {rsi:.0f} 지표는 박스권 하단 수급 탐색 국면입니다.",
-            f"• **시클리컬 전망**: 자율주행 소프트웨어 라이선싱 수입 가시화 시 강한 멀티플 재평가가 기대됩니다.\n"
-            f"• **트레이딩 전략**: 단기 지수 변동성을 활용하여 기술적 지지대 진입 시 분할 접근하고 손절가를 명확히 설정하는 것이 유효합니다."
+            f"• **펀더멘털 & 산업**: FSD v13 상용화, 로보택시 및 보급형 신차 투입 기대감이 하단을 방어하고 있습니다.\n\n"
+            f"• **수급 & 퀀트**: 분기 인도량 및 AI 칩 수급 이슈로 차익 매물이 출회되었으며, RSI {rsi:.0f} 지표는 박스권 하단 수급 탐색 상태입니다.",
+            f"• **시클리컬 전망**: 자율주행 소프트웨어 라이선싱 매출 가시화 시 강한 멀티플 재평가가 기대됩니다.\n\n"
+            f"• **트레이딩 전략**: 단기 변동성을 활용하여 기술적 지지대 진입 시 분할 접근하는 전략이 권장됩니다."
         ),
         "RXRX": (
-            f"• **펀더멘털 & 산업**: 엔비디아 BioNeMo 플랫폼과의 협력 기반 AI 신약 개발 알고리즘 및 파이프라인 임상 성과가 핵심 모멘텀입니다.\n"
-            f"• **수급 & 퀀트**: 임상 결과 발표 전 거래량 감소 속 눌림목이 심화되었으며, RSI {rsi:.0f} 상태는 하방 리스크가 상당 부분 선반영된 구간입니다.",
-            f"• **시클리컬 전망**: 임상 진행 경과에 따른 바이오 특유의 갭상승/하락 파동이 예상됩니다.\n"
-            f"• **트레이딩 전략**: 단기 급등 시 차익 실현과 하단 분할 매수 상호 전략을 적용하는 포트폴리오 관리가 요구됩니다."
+            f"• **펀더멘털 & 산업**: 엔비디아 협력 기반 AI 신약 개발 플랫폼 및 파이프라인 임상 데이터공개 이슈가 핵심 모멘텀입니다.\n\n"
+            f"• **수급 & 퀀트**: 임상 결과 발표 전 거래량 소진으로 눌림목이 심화되었으며, RSI {rsi:.0f} 지표는 하방 리스크가 반영된 수준입니다.",
+            f"• **시클리컬 전망**: 임상 진행 경과에 따른 바이오 특유의 갭상승/하락 파동이 예상됩니다.\n\n"
+            f"• **트레이딩 전략**: 단기 급등 시 차익 실현과 하단 분할 매수 상호 전략을 적용하는 포트폴리오 관리가 필요합니다."
         ),
         "PLTR": (
-            f"• **펀더멘털 & 산업**: AIP(인공지능 플랫폼) 고성장에 따른 민간 및 정부향 상업용 매출 급증이 펀더멘털의 강력한 견인차입니다.\n"
-            f"• **수급 & 퀀트**: 높은 멀티플 부담에 따른 기관 차익 실현 물량이 출회되었으나, 기본 수급 체질은 견고하게 유지되고 있습니다.",
-            f"• **시클리컬 전망**: AI 엔터프라이즈 전환 주도기업으로서 밸류에이션 보정 완료 후 지속적 우상향 추세가 유효합니다.\n"
-            f"• **트레이딩 전략**: RSI 지표 기반 눌림목 발생 시 지지선 확인 후 단계적 포지션을 확대하는 전략이 권장됩니다."
+            f"• **펀더멘털 & 산업**: AIP(인공지능 플랫폼) 고성장에 따른 상업용 매출 급증이 펀더멘털의 강력한 견인차입니다.\n\n"
+            f"• **수급 & 퀀트**: 높은 멀티플 부담으로 인한 기관 차익 실현 물량이 출회되었으나 기초 체력은 견고합니다.",
+            f"• **시클리컬 전망**: AI 엔터프라이즈 전환 주도기업으로서 밸류에이션 보정 완료 후 지속적 우상향 추세가 유효합니다.\n\n"
+            f"• **트레이딩 전략**: RSI 지표 기반 눌림목 발생 시 지지선 확인 후 포지션을 단계적으로 확대하는 것이 권장됩니다."
         )
     }
 
@@ -364,11 +400,11 @@ def generate_chart_analysis(t: str, cur_price: float, delta_pct: float, rsi: flo
         return expert_profiles[t][0], expert_profiles[t][1]
     
     default_reason = (
-        f"• **펀더멘털 & 산업**: {t} 기업 고유의 비즈니스 모멘텀과 기술주 장세 수급 연동성이 직접 반영되는 국면입니다.\n"
+        f"• **펀더멘털 & 산업**: {t} 기업 고유의 비즈니스 모멘텀과 기술주 수급 흐름이 주가 변동에 직접 반영되는 국면입니다.\n\n"
         f"• **수급 & 퀀트**: 전일 대비 {delta_pct:+.2f}% 변동 속에 RSI {rsi:.0f} 수치는 기술적 수급 균형점을 탐색 중입니다."
     )
     default_view = (
-        f"• **시클리컬 전망**: Prophet 예측 궤적상 중장기 방향성은 유지되며 지수 환경 영향을 수반합니다.\n"
+        f"• **시클리컬 전망**: Prophet 예측 궤적상 중장기 방향성은 유지되며 지수 환경 영향을 수반합니다.\n\n"
         f"• **트레이딩 전략**: 주요 마디가 지지 여부를 확인 후 위험 대비 보상 비율을 고려한 분할 접근이 적합합니다."
     )
     return default_reason, default_view
@@ -431,7 +467,7 @@ with st.spinner("최신 주가 데이터 로딩 중..."):
 tab1, tab2, tab3, tab4 = st.tabs(["📈 차트", "🧠 리포트", "🌟 추천", "📝 일지"])
 
 # ========================================================
-# TAB 1: 차트 & 초전문가 입체 분석
+# TAB 1: 차트 & 초전문가 가독성 카드 분석
 # ========================================================
 with tab1:
     if data.empty:
@@ -488,20 +524,31 @@ with tab1:
 
         trend_desc = "상승 강세" if delta >= 0 else "하락 조정"
         st.markdown("---")
-        st.markdown(f"### 📊 {ticker} 입체 주가 분석 및 시나리오")
         
+        # 💡 [핵심 1] 섹션 타이틀: 무조건 한 줄 유지 CSS 클래스 적용
+        st.markdown(f'<div class="section-title">📊 {ticker} 입체 주가 분석 및 시나리오</div>', unsafe_allow_html=True)
+        
+        # 💡 [핵심 2] 분석 내용: 가독성 높은 카드형 UI로 분리
         st.markdown(f"""
-**1. 현재 차트 및 지표**
-* **현재가**: **${current_price:,.2f}** (전일 대비 **{delta_pct:+.2f}%** {trend_desc})
-* **RSI 지표**: **{rsi_val:.0f}** ({rsi_state} 구간)
-* **52주 고점 대비 낙폭(MDD)**: **{mdd_val:.1f}%**
+        <div class="analysis-card">
+            <div class="analysis-card-title">1. 현재 차트 및 핵심 지표</div>
+            <div class="analysis-card-content">
+                • <b>현재가</b>: ${current_price:,.2f} (전일 대비 {delta_pct:+.2f}% {trend_desc})<br>
+                • <b>RSI 지표</b>: {rsi_val:.0f} ({rsi_state} 구간)<br>
+                • <b>52주 최고가 대비 낙폭(MDD)</b>: {mdd_val:.1f}%
+            </div>
+        </div>
 
-**2. 다차원 변동 원인 분석**
-{reason_msg}
+        <div class="analysis-card">
+            <div class="analysis-card-title">2. 다차원 변동 원인 분석</div>
+            <div class="analysis-card-content">{reason_msg.replace('\n', '<br>')}</div>
+        </div>
 
-**3. 향후 주가 예측 및 트레이딩 관점**
-{view_msg}
-        """)
+        <div class="analysis-card">
+            <div class="analysis-card-title">3. 향후 주가 예측 및 트레이딩 관점</div>
+            <div class="analysis-card-content">{view_msg.replace('\n', '<br>')}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 # ========================================================
 # TAB 2: AI 리포트
