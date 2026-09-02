@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템
+# [3] 디자인 시스템 (상승=빨강, 하락=파랑)
 # =========================================================
 st.markdown("""
 <style>
@@ -275,6 +275,49 @@ def get_ai_text(api_key: str, model_name: str, prompt: str) -> str:
 def get_active_gemini_key(sidebar_key: str) -> str:
     return sidebar_key or os.environ.get("GEMINI_API_KEY", "")
 
+# 💡 차트 하단 종목별 맞춤 분석 실시간 생성 함수
+@st.cache_data(ttl=1800, show_spinner=False)
+def generate_chart_analysis(t: str, cur_price: float, delta_pct: float, rsi: float, mdd: float, api_key: str, model_n: str) -> tuple:
+    if api_key:
+        prompt = (
+            f"현재 시점 {date.today().year}년. 미국 주식 종목 '{t}'의 기술적 수치:\n"
+            f"- 현재가: ${cur_price:.2f} (전일대비 {delta_pct:+.2f}%)\n"
+            f"- RSI(14): {rsi:.0f}\n"
+            f"- MDD: {mdd:.1f}%\n"
+            f"다음 2가지 항목을 각각 2문장 이내로 명확하게 한국어로 설명해줘.\n"
+            f"1) 주가 변동 원인: (해당 기업 {t}의 사업 특성, 최근 이슈, 수급 모멘텀을 반영하여 작성)\n"
+            f"2) 향후 주가 예측 및 매매 관점: (기술적 지표와 모멘텀 기반 접근 전략 작성)"
+        )
+        try:
+            res = get_ai_text(api_key, model_n, prompt)
+            lines = [line.strip() for line in res.split("\n") if line.strip()]
+            reason_p = ""
+            view_p = ""
+            for l in lines:
+                if "변동 원인" in l or "1)" in l:
+                    reason_p = l.split(":", 1)[-1].strip() if ":" in l else l
+                elif "예측" in l or "2)" in l or "관점" in l:
+                    view_p = l.split(":", 1)[-1].strip() if ":" in l else l
+            if reason_p and view_p:
+                return reason_p, view_p
+        except Exception:
+            pass
+
+    # API 키가 없을 때의 동적 종목별 백업 문구
+    company_profiles = {
+        "ASTS": "위성 통신 상용화 기대감 및 궤도 진입 모멘텀과 기술 성장주 특유의 높은 수급 변동성이 작용한 결과입니다.",
+        "TSLA": "전기차 인도량 지표, 자율주행(FSD) 및 로보택시 기대감과 빅테크 수급 이동에 따른 기술적 눌림목 구간입니다.",
+        "OKLO": "차세대 SMR(소형모듈원자로) 에너지 테마 모멘텀과 원자력 승인 규제 이슈에 따른 수급 변동성 과정입니다.",
+        "IONQ": "양자 컴퓨팅 기술 성과 기대감과 중소형 고성장주 특유의 이평선 차익 실현 물량 소화 단계를 거치고 있습니다.",
+        "RXRX": "AI 신약 개발 플랫폼 바이오 테마 이슈 및 임상 모멘텀과 기술주 장세 수급의 영향을 받고 있습니다.",
+        "PLTR": "AI 엔터프라이즈 데이터 플랫폼 수요 급증 및 실적 모멘텀과 단기 수급 조정이 상존하는 흐름입니다."
+    }
+    default_profile = company_profiles.get(t, f"{t} 기업의 비즈니스 모멘텀과 대외 시장 수급 흐름이 기술적으로 반영된 상태입니다.")
+    
+    reason_msg = f"{t} 종목은 {default_profile} 전일 대비 {delta_pct:+.2f}% 변동을 보이며 RSI {rsi:.0f} 수준의 수급 구간을 형성하고 있습니다."
+    view_msg = f"Prophet AI 장기 예측 궤적 및 RSI {rsi:.0f} 지표를 감안할 때, 단기 지지선 형성 여부를 확인 후 분할 매수 관점의 접근이 유효합니다."
+    return reason_msg, view_msg
+
 def render_mini_grid(cards: list):
     parts = []
     for c in cards:
@@ -333,7 +376,7 @@ with st.spinner("최신 주가 데이터 로딩 중..."):
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 차트", "🧠 리포트", "🎯 목표", "🌟 추천", "📝 일지"])
 
 # ========================================================
-# TAB 1: 차트 & 동적 분석 리포트
+# TAB 1: 차트 & 종목별 개별 AI 분석 리포트
 # ========================================================
 with tab1:
     if data.empty:
@@ -385,29 +428,11 @@ with tab1:
         fig_chart.update_yaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4", size=9))
         st.plotly_chart(fig_chart, use_container_width=True)
 
-        # 💡 [핵심] 선택 종목 지표에 따라 동적으로 생성되는 원인 및 전망 문구 생성기
+        # 💡 [핵심] 종목에 맞춰 실시간으로 상이하게 작성되는 AI 분석 문구 호출
+        active_key = get_active_gemini_key(api_key_input)
+        reason_msg, view_msg = generate_chart_analysis(ticker, current_price, delta_pct, rsi_val, mdd_val, active_key, model_name)
+
         trend_desc = "상승 강세" if delta >= 0 else "하락 조정"
-        
-        # 1. 동적 원인 문구 조건 분기
-        if delta >= 0:
-            if rsi_val >= 70:
-                reason_msg = f"{ticker} 종목은 최근 매수세가 강하게 몰리며 RSI {rsi_val:.0f}의 과매수 구간에 진입했습니다. 단기 상승 모멘텀이 유지되고 있으나 단기 차익 실현 유의가 필요합니다."
-            else:
-                reason_msg = f"{ticker} 종목은 바닥권에서 거래량을 동반한 우상향 수급이 유입되며 상승세를 나타내고 있습니다. 안정적인 저점 다지기 후 기술적 반등 흐름입니다."
-        else:
-            if rsi_val <= 30:
-                reason_msg = f"{ticker} 종목은 최근 연속 조정으로 RSI {rsi_val:.0f} 수준의 단기 과매도 구간에 들어섰습니다. 과도한 투매 물량이 나오며 기술적 반등 임계점에 가깝습니다."
-            else:
-                reason_msg = f"{ticker} 종목은 매익 실현 물량 소화 및 기술적 눌림목 형성 과정에 있습니다. 대외 금리 변동성 및 성장주 수급 이동 영향으로 단기 숨고르기를 진행 중입니다."
-
-        # 2. 동적 전망 문구 조건 분기
-        if rsi_val >= 70:
-            view_msg = f"Prophet AI 예측(붉은선)은 장기 우상향 궤적을 제시하지만, RSI {rsi_val:.0f}로 고점 과열 상태입니다. 신규 매수보다는 분할 익절 및 눌림목 자리를 확인하는 전략이 유효합니다."
-        elif rsi_val <= 30:
-            view_msg = f"RSI {rsi_val:.0f} 과매도 저평가 구간으로 기술적 주가 반등 가능성이 높은 지점입니다. 분할 매수 관점의 관망 및 접근이 유효한 타점입니다."
-        else:
-            view_msg = f"Prophet AI 예측(붉은선) 기반 우상향 모멘텀이 유지되는 추세입니다. RSI {rsi_val:.0f}의 중립 수급 상태이므로 지지선 확보 여부를 살피며 접근하시기 바랍니다."
-
         st.markdown("---")
         st.markdown(f"### 📊 {ticker} 주가 분석 및 예측")
         
