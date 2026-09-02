@@ -137,7 +137,6 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 .mini-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1rem; color: var(--text); white-space: nowrap; }
 .mini-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; margin-top: 2px; font-weight: 600; }
 
-/* 💡 4개 탭 가로 균등 분할 */
 .stTabs [data-baseweb="tab-list"] {
     display: flex !important;
     width: 100% !important;
@@ -259,9 +258,10 @@ def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
     m.fit(df_train)
     return m.predict(m.make_future_dataframe(periods=years * 365))
 
+# 💡 최신 Gemini 모델 타겟 설정 (구버전 gemini-2.5-flash 완전 제거)
 def get_ai_text(api_key: str, model_name: str, prompt: str) -> str:
     client = genai.Client(api_key=api_key)
-    target_models = ["gemini-3.6-flash", model_name, "gemini-2.5-flash"]
+    target_models = ["gemini-3.6-flash", model_name, "gemini-1.5-flash"]
     last_err = None
     for m in target_models:
         if not m: continue
@@ -391,7 +391,6 @@ with st.expander("➕ 종목 관리"):
 with st.spinner("최신 주가 데이터 로딩 중..."):
     data = load_price_data(ticker)
 
-# 💡 목표 탭을 제거하고 4개 탭으로 단순화
 tab1, tab2, tab3, tab4 = st.tabs(["📈 차트", "🧠 리포트", "🌟 추천", "📝 일지"])
 
 # ========================================================
@@ -498,7 +497,7 @@ with tab2:
         st.markdown(item["content"])
 
 # ========================================================
-# TAB 3: AI 자율 전세계 뉴스 판단 추천
+# TAB 3: AI 자율 추천
 # ========================================================
 with tab3:
     sector_options = [
