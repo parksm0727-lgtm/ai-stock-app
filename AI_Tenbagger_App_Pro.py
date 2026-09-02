@@ -12,6 +12,7 @@ import os
 import uuid
 import json
 import time
+import pytz
 
 # =========================================================
 # [1] 페이지 설정
@@ -48,7 +49,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템
+# [3] 디자인 시스템 (가독성 최적화 & 깔끔한 카드 스타일)
 # =========================================================
 st.markdown("""
 <style>
@@ -113,7 +114,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     color: var(--text) !important;
-    margin-top: 8px !important;
+    margin-top: 14px !important;
     margin-bottom: 8px !important;
     display: block !important;
     width: 100% !important;
@@ -125,21 +126,41 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 12px 14px;
+    padding: 14px 16px;
     margin-bottom: 12px;
 }
 .analysis-card-title {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     font-weight: 700;
     color: var(--accent);
-    margin-bottom: 8px;
-    border-bottom: 1px dashed var(--border);
-    padding-bottom: 4px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
 }
 .analysis-card-content {
-    font-size: 0.82rem;
-    line-height: 1.6;
-    color: var(--text);
+    font-size: 0.84rem;
+    line-height: 1.7;
+    color: #DDE1E8;
+}
+
+/* 카드 내부 가독성을 높이는 태그 및 불릿 디자인 */
+.sub-badge {
+    display: inline-block;
+    background-color: #1E293B;
+    color: #38BDF8;
+    font-weight: 700;
+    font-size: 0.8rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-top: 8px;
+    margin-bottom: 6px;
+    border: 1px solid #334155;
+}
+
+.sub-item {
+    padding-left: 6px;
+    margin-bottom: 10px;
+    color: #E2E8F0;
 }
 
 .hero-price {
@@ -249,6 +270,11 @@ def save_json_file(filename, data):
     except Exception as e:
         st.error(f"저장 실패: {e}")
 
+# KST (한국 표준시) 구하기
+def get_kst_now_str():
+    kst = pytz.timezone('Asia/Seoul')
+    return datetime.now(kst).strftime("%Y-%m-%d %H:%M")
+
 if "watchlist" not in st.session_state:
     st.session_state["watchlist"] = load_json_file(WATCHLIST_FILE, DEFAULT_WATCHLIST.copy())
 
@@ -352,40 +378,24 @@ def get_active_gemini_key(sidebar_key: str) -> str:
 def get_fallback_expert_analysis(t: str, delta_pct: float, rsi: float, mdd: float) -> tuple:
     expert_profiles = {
         "ASTS": (
-            f"• <b>펀더멘털 & 산업</b>: 저궤도(LEO) Direct-to-Cell 위성 통신망 구축 및 글로벌 MNO(AT&T, Verizon) 파트너십 상용화 기대감이 상방 모멘텀을 이끕니다.<br><br>"
-            f"• <b>수급 & 퀀트</b>: 최근 단기 급등 후 과열 수급을 식히는 단계이며, RSI {rsi:.0f} 수치는 50일 이동평균선 근처에서 지지력을 재시험하는 기술적 매물 소화 과정입니다.",
-            f"• <b>시클리컬 전망</b>: 상업용 위성 발사 성공 및 주파수 승인 촉매 유효 시 장기 우상향 확장성이 높습니다.<br><br>"
-            f"• <b>트레이딩 전략</b>: MDD {mdd:.1f}%의 변동성을 고려하여 핵심 지지선 연동 확인 후 리스크 관리 기반 분할 매수 접근이 적합합니다."
+            f"• <b>펀더멘털 & 산업</b>\n"
+            f"- 저궤도(LEO) Direct-to-Cell 위성 통신망 구축 및 글로벌 MNO(AT&T, Verizon) 파트너십 상용화 기대감이 상방 모멘텀을 형성하고 있습니다.\n\n"
+            f"• <b>수급 & 퀀트</b>\n"
+            f"- 최근 단기 급등 후 수급 과열을 식히는 단계이며, RSI {rsi:.0f} 지표는 50일 이동평균선 부근에서 기술적 지지력을 소화 중입니다.",
+            f"• <b>시클리컬 전망</b>\n"
+            f"- 상업용 위성 발사 성공 및 주파수 승인 촉매 유효 시 장기 우상향 확장 가능성이 매우 높습니다.\n\n"
+            f"• <b>트레이딩 전략</b>\n"
+            f"- MDD {mdd:.1f}%의 변동성을 고려하여 1차 지지선 확인 후 리스크 관리 기반의 분할 매수 접근을 추천합니다."
         ),
         "OKLO": (
-            f"• <b>펀더멘털 & 산업</b>: AI 빅테크 데이터센터 전력 공급을 위한 차세대 소형모듈원자로(SMR) 테마 수혜주로 NRC 규제 승인 이슈가 핵심 변수입니다.<br><br>"
-            f"• <b>수급 & 퀀트</b>: 성장주 수급 이동과 연계된 단기 조정으로, RSI {rsi:.0f} 지표는 기간 조정을 통한 기술적 매물대 다지기를 나타냅니다.",
-            f"• <b>시클리컬 전망</b>: 2030년 전력 공급 개시 전까지 인허가 뉴스 흐름에 따른 변동성 국면이 이어질 전망입니다.<br><br>"
-            f"• <b>트레이딩 전략</b>: 하방 지지선 연동 확인 후 단기 매물대 돌파 여부에 맞춰 분할 진입하는 전략이 유효합니다."
-        ),
-        "IONQ": (
-            f"• <b>펀더멘털 & 산업</b>: 바륨 기반 이온트랩 양자 컴퓨팅 성능 고도화와 정부/기업 공급 계약 확대가 중장기 기초 체력을 형성합니다.<br><br>"
-            f"• <b>수급 & 퀀트</b>: 성장주 장세의 리스크 오프 기조에 따라 MDD {mdd:.1f}%를 기록 중이며, RSI {rsi:.0f} 수준은 하방 압력이 완화된 구간입니다.",
-            f"• <b>시클리컬 전망</b>: Prophet 모델 기반 우상향 궤적을 그리나 기술 상용화까지 장기 파동 특성을 보입니다.<br><br>"
-            f"• <b>트레이딩 전략</b>: 주요 학회 성과 공개 및 실적 모멘텀 전 분할 매수로 접근하는 전략이 바람직합니다."
-        ),
-        "TSLA": (
-            f"• <b>펀더멘털 & 산업</b>: FSD v13 상용화, 로보택시 및 보급형 신차 투입 기대감이 하단을 방어하고 있습니다.<br><br>"
-            f"• <b>수급 & 퀀트</b>: 분기 인도량 및 AI 칩 수급 이슈로 차익 매물이 출회되었으며, RSI {rsi:.0f} 지표는 박스권 하단 수급 탐색 상태입니다.",
-            f"• <b>시클리컬 전망</b>: 자율주행 소프트웨어 라이선싱 매출 가시화 시 강한 멀티플 재평가가 기대됩니다.<br><br>"
-            f"• <b>트레이딩 전략</b>: 단기 변동성을 활용하여 기술적 지지대 진입 시 분할 접근하는 전략이 권장됩니다."
-        ),
-        "RXRX": (
-            f"• <b>펀더멘털 & 산업</b>: 엔비디아 협력 기반 AI 신약 개발 플랫폼 및 파이프라인 임상 데이터공개 이슈가 핵심 모멘텀입니다.<br><br>"
-            f"• <b>수급 & 퀀트</b>: 임상 결과 발표 전 거래량 소진으로 눌림목이 심화되었으며, RSI {rsi:.0f} 지표는 하방 리스크가 반영된 수준입니다.",
-            f"• <b>시클리컬 전망</b>: 임상 진행 경과에 따른 바이오 특유의 갭상승/하락 파동이 예상됩니다.<br><br>"
-            f"• <b>트레이딩 전략</b>: 단기 급등 시 차익 실현과 하단 분할 매수 상호 전략을 적용하는 포트폴리오 관리가 필요합니다."
-        ),
-        "PLTR": (
-            f"• <b>펀더멘털 & 산업</b>: AIP(인공지능 플랫폼) 고성장에 따른 상업용 매출 급증이 펀더멘털의 강력한 견인차입니다.<br><br>"
-            f"• <b>수급 & 퀀트</b>: 높은 멀티플 부담으로 인한 기관 차익 실현 물량이 출회되었으나 기초 체력은 견고합니다.",
-            f"• <b>시클리컬 전망</b>: AI 엔터프라이즈 전환 주도기업으로서 밸류에이션 보정 완료 후 지속적 우상향 추세가 유효합니다.<br><br>"
-            f"• <b>트레이딩 전략</b>: RSI 지표 기반 눌림목 발생 시 지지선 확인 후 포지션을 단계적으로 확대하는 것이 권장됩니다."
+            f"• <b>펀더멘털 & 산업</b>\n"
+            f"- AI 빅테크 데이터센터 전력 공급을 위한 차세대 소형모듈원자로(SMR) 테마 수혜주로 NRC 규제 승인 이슈가 핵심 변수입니다.\n\n"
+            f"• <b>수급 & 퀀트</b>\n"
+            f"- 성장주 수급 이동과 연계된 단기 조정으로, RSI {rsi:.0f} 지표는 기간 조정을 통한 기술적 매물대 다지기를 나타냅니다.",
+            f"• <b>시클리컬 전망</b>\n"
+            f"- 2030년 전력 공급 개시 전까지 인허가 뉴스 흐름에 따른 변동성 국면이 이어질 전망입니다.\n\n"
+            f"• <b>트레이딩 전략</b>\n"
+            f"- 하방 지지선 연동 확인 후 단기 매물대 돌파 여부에 맞춰 분할 진입하는 전략이 유효합니다."
         )
     }
 
@@ -393,19 +403,54 @@ def get_fallback_expert_analysis(t: str, delta_pct: float, rsi: float, mdd: floa
         return expert_profiles[t][0], expert_profiles[t][1]
     
     default_reason = (
-        f"• <b>펀더멘털 & 산업</b>: {t} 기업 고유의 비즈니스 모멘텀과 기술주 수급 흐름이 주가 변동에 직접 반영되는 국면입니다.<br><br>"
-        f"• <b>수급 & 퀀트</b>: 전일 대비 {delta_pct:+.2f}% 변동 속에 RSI {rsi:.0f} 수치는 기술적 수급 균형점을 탐색 중입니다."
+        f"• <b>펀더멘털 & 산업</b>\n"
+        f"- {t} 기업 고유의 비즈니스 모멘텀과 기술주 수급 흐름이 주가 변동에 직접 반영되는 국면입니다.\n\n"
+        f"• <b>수급 & 퀀트</b>\n"
+        f"- 전일 대비 {delta_pct:+.2f}% 변동 속에 RSI {rsi:.0f} 수치는 기술적 수급 균형점을 탐색 중입니다."
     )
     default_view = (
-        f"• <b>시클리컬 전망</b>: Prophet 예측 궤적상 중장기 방향성은 유지되며 지수 환경 영향을 수반합니다.<br><br>"
-        f"• <b>트레이딩 전략</b>: 주요 마디가 지지 여부를 확인 후 위험 대비 보상 비율을 고려한 분할 접근이 적합합니다."
+        f"• <b>시클리컬 전망</b>\n"
+        f"- Prophet 예측 궤적상 중장기 우상향 방향성은 유지되며 지수 환경의 영향을 지지받고 있습니다.\n\n"
+        f"• <b>트레이딩 전략</b>\n"
+        f"- 주요 마디가 지지 여부를 확인 후 위험 대비 보상 비율을 고려한 분할 접근이 적합합니다."
     )
     return default_reason, default_view
+
+def format_ai_content_to_html(text: str) -> str:
+    """ AI가 생성한 텍스트를 보기 좋게 HTML 박스와 줄바꿈 구조로 정돈하는 가공 함수 """
+    if not text:
+        return ""
+    
+    lines = text.split("\n")
+    formatted_lines = []
+    
+    for line in lines:
+        line_str = line.strip()
+        if not line_str:
+            formatted_lines.append("<br>")
+            continue
+            
+        # 마크다운 강조를 <b> 태그로 변환
+        line_str = line_str.replace("**", "<b>").replace("**", "</b>")
+        
+        # '• ' 로 시작하는 주제 제목은 배지 형태로 포맷팅
+        if line_str.startswith("•") or line_str.startswith("*"):
+            title_text = line_str.lstrip("•* ").strip()
+            formatted_lines.append(f'<div class="sub-badge">{title_text}</div>')
+        # '- ' 로 시작하는 항목은 서브 리스트 형태로 간격 조정
+        elif line_str.startswith("-"):
+            item_text = line_str.lstrip("- ").strip()
+            formatted_lines.append(f'<div class="sub-item">• {item_text}</div>')
+        else:
+            formatted_lines.append(f'<div>{line_str}</div>')
+            
+    return "".join(formatted_lines)
 
 def get_chart_analysis_with_1hr_cache(t: str, cur_price: float, delta_pct: float, rsi: float, mdd: float, api_key: str, model_n: str, force_refresh: bool = False) -> tuple:
     cache = st.session_state["chart_analysis_cache"]
     now_ts = time.time()
     
+    # 1시간(3600초) 지남 여부 체크
     if not force_refresh and t in cache:
         item = cache[t]
         last_ts = item.get("timestamp", 0)
@@ -420,12 +465,16 @@ def get_chart_analysis_with_1hr_cache(t: str, cur_price: float, delta_pct: float
             f"- RSI(14): {rsi:.0f}, MDD: {mdd:.1f}%\n\n"
             f"다음 2가지 구조로 다방면의 초전문가적 분석 결과를 작성하세요.\n\n"
             f"[원인]\n"
-            f"• 펀더멘털 & 산업: {t}의 핵심 기술 경쟁력 및 사업 성장 이슈\n"
-            f"• 수급 & 퀀트: 기술적 파동 및 RSI({rsi:.0f}), MDD({mdd:.1f}%) 수급 메커니즘\n\n"
+            f"• 펀더멘털 & 산업\n"
+            f"- {t}의 핵심 기술 경쟁력, 사업 성장 이슈 및 가치 평가\n\n"
+            f"• 수급 & 퀀트\n"
+            f"- 기술적 파동 및 RSI({rsi:.0f}), MDD({mdd:.1f}%) 수급 메커니즘\n\n"
             f"[관점]\n"
-            f"• 시클리컬 전망: Prophet AI 궤적 및 거시 구조 전망\n"
-            f"• 트레이딩 전략: 지지/저항 및 타깃/손절 매매 전략\n\n"
-            f"구체적인 전문 어휘를 사용하여 작성하고, 반드시 '[원인]'과 '[관점]' 태그를 지켜주세요."
+            f"• 시클리컬 전망\n"
+            f"- Prophet AI 궤적 및 거시 구조 전망\n\n"
+            f"• 트레이딩 전략\n"
+            f"- 지지/저항 및 타깃/손절 매매 전략\n\n"
+            f"각 항목별로 깔끔하게 들여쓰기(- )와 줄바꿈을 사용하여 보기 쉽게 작성하고, 반드시 '[원인]'과 '[관점]' 태그를 구분해 주세요."
         )
         try:
             res = get_ai_text(api_key, model_n, prompt)
@@ -439,15 +488,15 @@ def get_chart_analysis_with_1hr_cache(t: str, cur_price: float, delta_pct: float
     if not reason_msg or not view_msg:
         reason_msg, view_msg = get_fallback_expert_analysis(t, delta_pct, rsi, mdd)
 
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    now_kst_str = get_kst_now_str()
     cache[t] = {
         "timestamp": now_ts,
-        "created_at": now_str,
+        "created_at": now_kst_str,
         "reason": reason_msg,
         "view": view_msg
     }
     save_json_file(CHART_ANALYSIS_FILE, cache)
-    return reason_msg, view_msg, now_str, True
+    return reason_msg, view_msg, now_kst_str, True
 
 def render_mini_grid(cards: list):
     parts = []
@@ -563,7 +612,7 @@ with tab1:
 
         st.markdown("---")
         
-        # 💡 [직관적인 전면 수동 재분석 버튼]
+        # 💡 [버튼 및 타이틀 레이아웃]
         st.markdown(f'<div class="section-title">📊 {ticker} 입체 주가 분석</div>', unsafe_allow_html=True)
         force_run = st.button("🔄 AI 즉시 수동 재분석", type="primary", use_container_width=True)
 
@@ -571,20 +620,21 @@ with tab1:
             ticker, current_price, delta_pct, rsi_val, mdd_val, active_key, model_name, force_refresh=force_run
         )
 
-        reason_msg_html = reason_msg.replace("**", "<b>").replace("**", "</b>").replace("\n", "<br>")
-        view_msg_html = view_msg.replace("**", "<b>").replace("**", "</b>").replace("\n", "<br>")
+        reason_msg_html = format_ai_content_to_html(reason_msg)
+        view_msg_html = format_ai_content_to_html(view_msg)
 
         trend_desc = "상승 강세" if delta >= 0 else "하락 조정"
         
-        st.caption(f"📅 **마지막 분석 완료:** `{created_at_str}` (자동 재분석 주기: 1시간)")
+        st.caption(f"📅 **마지막 분석 완료 (KST):** `{created_at_str}` (자동 재분석 주기: 1시간)")
 
         st.markdown(f"""
         <div class="analysis-card">
             <div class="analysis-card-title">1. 현재 차트 및 핵심 지표</div>
             <div class="analysis-card-content">
-                • <b>현재가</b>: ${current_price:,.2f} (전일 대비 {delta_pct:+.2f}% {trend_desc})<br>
-                • <b>RSI 지표</b>: {rsi_val:.0f} ({rsi_state} 구간)<br>
-                • <b>52주 최고가 대비 낙폭(MDD)</b>: {mdd_val:.1f}%
+                <div class="sub-badge">지표 동향</div>
+                <div class="sub-item">• <b>현재가</b>: ${current_price:,.2f} (전일 대비 {delta_pct:+.2f}% {trend_desc})</div>
+                <div class="sub-item">• <b>RSI 지표</b>: {rsi_val:.0f} ({rsi_state} 구간)</div>
+                <div class="sub-item">• <b>52주 최고가 대비 낙폭(MDD)</b>: {mdd_val:.1f}%</div>
             </div>
         </div>
 
@@ -615,9 +665,9 @@ with tab2:
                 prompt = f"현재 {date.today().year}년 기준. 종목 '{ticker}' 관련 뉴스:\n{news_text}\n핵심 단기 촉매와 리스크 요약."
                 try: 
                     res_text = get_ai_text(active_key, model_name, prompt)
-                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    now_kst_str = get_kst_now_str()
                     st.session_state["ai_report_cache"][ticker] = {
-                        "created_at": now_str,
+                        "created_at": now_kst_str,
                         "content": res_text
                     }
                     save_json_file(REPORT_FILE, st.session_state["ai_report_cache"])
@@ -627,7 +677,7 @@ with tab2:
 
     if ticker in st.session_state["ai_report_cache"]:
         item = st.session_state["ai_report_cache"][ticker]
-        st.caption(f"📅 **생성 일시:** `{item['created_at']}`")
+        st.caption(f"📅 **생성 일시 (KST):** `{item['created_at']}`")
         st.markdown(item["content"])
 
 # ========================================================
@@ -660,9 +710,9 @@ with tab3:
                         prompt = f"현재 시점 {date.today().year}년. '{sector_choice}' 분야 10배 성장 유망 중소형주 3개 요약."
                         
                     res_text = get_ai_text(active_key, model_name, prompt)
-                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    now_kst_str = get_kst_now_str()
                     st.session_state["ai_recommend_cache"][sector_choice] = {
-                        "created_at": now_str,
+                        "created_at": now_kst_str,
                         "content": res_text
                     }
                     save_json_file(RECOMMEND_FILE, st.session_state["ai_recommend_cache"])
@@ -672,7 +722,7 @@ with tab3:
 
     if sector_choice in st.session_state["ai_recommend_cache"]:
         item = st.session_state["ai_recommend_cache"][sector_choice]
-        st.caption(f"📅 **분석 일시:** `{item['created_at']}`")
+        st.caption(f"📅 **분석 일시 (KST):** `{item['created_at']}`")
         st.markdown(item["content"])
 
 # ========================================================
