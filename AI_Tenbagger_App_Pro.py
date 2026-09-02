@@ -47,7 +47,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (상승=빨강, 하락=파랑)
+# [3] 디자인 시스템 (4개 탭 가로 균등 분할)
 # =========================================================
 st.markdown("""
 <style>
@@ -137,7 +137,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 .mini-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1rem; color: var(--text); white-space: nowrap; }
 .mini-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; margin-top: 2px; font-weight: 600; }
 
-/* 탭 5개 가로 균등 분할 */
+/* 💡 4개 탭 가로 균등 분할 */
 .stTabs [data-baseweb="tab-list"] {
     display: flex !important;
     width: 100% !important;
@@ -161,7 +161,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     color: var(--text-muted) !important;
     border-radius: 6px !important;
     font-weight: 600 !important;
-    font-size: 0.78rem !important;
+    font-size: 0.85rem !important;
     padding: 6px 0px !important;
     margin: 0 !important;
 }
@@ -275,7 +275,6 @@ def get_ai_text(api_key: str, model_name: str, prompt: str) -> str:
 def get_active_gemini_key(sidebar_key: str) -> str:
     return sidebar_key or os.environ.get("GEMINI_API_KEY", "")
 
-# 💡 전문적인 종목별 맞춤 분석 실시간 생성기 (ASTS 포함 전체 정상 출력 보장)
 @st.cache_data(ttl=1800, show_spinner=False)
 def generate_chart_analysis(t: str, cur_price: float, delta_pct: float, rsi: float, mdd: float, api_key: str, model_n: str) -> tuple:
     if api_key:
@@ -303,14 +302,13 @@ def generate_chart_analysis(t: str, cur_price: float, delta_pct: float, rsi: flo
         except Exception:
             pass
 
-    # 💡 고유 심층 펀더멘털 기반 전문 백업 분석 엔진
     profiles = {
         "ASTS": (
-            f"저궤도(LEO) Direct-to-Cell 차세대 위성 통신망 구축 및 글로벌 MNO(AT&T, Verizon) 파트너십 상용화 기대감이 핵심 동력입니다. 단기 급등 후 과열 수급을 식히는 차익 실현 물량 소화 단계이며, 기술적으로 50일 이평선 자치 지지력을 시험하는 구간입니다.",
+            f"저궤도(LEO) Direct-to-Cell 차세대 위성 통신망 구축 및 글로벌 MNO(AT&T, Verizon) 파트너십 상용화 기대감이 핵심 동력입니다. 단기 급등 후 과열 수급을 식히는 차익 실현 물량 소화 단계이며, 기술적으로 50일 이평선 지지력을 시험하는 구간입니다.",
             f"위성 궤도 배치 및 서비스 개시 촉매에 따른 우상향 확장성이 유효합니다. RSI {rsi:.0f} 수준은 거품이 걷힌 건강한 눌림목을 형성하고 있으므로 핵심 지지선에서 분할 매수 접근이 적합합니다."
         ),
         "OKLO": (
-            f"빅테크 데이터센터 전력 수요 증가에 따른 소형모듈원자로(SMR) 테마 기대감과 NRC 규제 승인 절차가 주가 변동성을 견인하고 있습니다. 최근 급등에 따른 차익 매물 출출과 고연령 수급 이동으로 단기 기술적 조정을 받았습니다.",
+            f"빅테크 데이터센터 전력 수요 증가에 따른 소형모듈원자로(SMR) 테마 기대감과 NRC 규제 승인 절차가 주가 변동성을 견인하고 있습니다. 최근 급등에 따른 차익 매물 출회와 고연령 수급 이동으로 단기 기술적 조정을 받았습니다.",
             f"차세대 에너지원의 장기 성장 궤적이 견고하나, 인허가 리스크 및 착공 일정 지연 리스크가 수급에 반영되고 있습니다. RSI {rsi:.0f} 부근에서 바닥 지지대를 다지는 확인 매수 전략이 유효합니다."
         ),
         "IONQ": (
@@ -318,15 +316,15 @@ def generate_chart_analysis(t: str, cur_price: float, delta_pct: float, rsi: flo
             f"Prophet AI 예측 모델 기준 10년 단위의 기술 개화 모멘텀이 유지됩니다. MDD {mdd:.1f}%는 기술주 특유의 깊은 조정 구간이며, 기술 성과 발표 전 분할 진입이 바람직합니다."
         ),
         "TSLA": (
-            f"FSD v13 상용화, 로보택시 및 2만 달러대 신차 보급형 플래그십 기대감이 하단을 지지하는 가운데, 분기 인도량 및 AI 칩 수급 이슈로 단기 기술적 박스권 하단 테스트가 이어지고 있습니다.",
+            f"FSD v13 상용화, 로보택시 및 보급형 신차 기대감이 하단을 지지하는 가운데, 분기 인도량 및 AI 칩 수급 이슈로 단기 기술적 박스권 하단 테스트가 이어지고 있습니다.",
             f"RSI {rsi:.0f} 수준은 수급 과열이 완화된 지점으로, 지수 조정과 연계된 단기 변동성을 활용하여 장기 AI 에코시스템 성장 가치에 기반한 분할 접근이 유효합니다."
         ),
         "RXRX": (
-            f"엔비디아 협력 기반 AI 신약 개발 플랫폼 바이오 테마 및 파이프라인 임상 결과에 민감하게 반응하고 있습니다. 임상 대기 기간 동안의 거래량 소전으로 눌림목이 심화된 형태입니다.",
+            f"엔비디아 협력 기반 AI 신약 개발 플랫폼 바이오 테마 및 파이프라인 임상 결과에 민감하게 반응하고 있습니다. 임상 대기 기간 동안의 거래량 소진으로 눌림목이 심화된 형태입니다.",
             f"바이오 성장주 특성상 높은 변동성을 수반하므로, 핵심 지지선 부근에서 리스크 관리 위주의 분할 진입 전략이 권장됩니다."
         ),
         "PLTR": (
-            f"AIP(인공지능 플랫폼) 중심의 기업형 및 정부향 상업용 매출 고성장이 강력한 기초 체력을 형성하고 있습니다. 고P/E에 따른 밸류에이션 보정 국면에서 매익 실현 물량이 출회되고 있습니다.",
+            f"AIP(인공지능 플랫폼) 중심의 기업형 및 정부향 상업용 매출 고성장이 강력한 기초 체력을 형성하고 있습니다. 고P/E에 따른 밸류에이션 보정 국면에서 차익 실현 물량이 출회되고 있습니다.",
             f"기업 체질이 지속 강화되고 있어 기관 수급 유입 재개 시 반등 모멘텀이 강하게 작용할 전망입니다. RSI 지표 수치 관찰을 통한 눌림목 타점 잡기가 유효합니다."
         )
     }
@@ -393,10 +391,11 @@ with st.expander("➕ 종목 관리"):
 with st.spinner("최신 주가 데이터 로딩 중..."):
     data = load_price_data(ticker)
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 차트", "🧠 리포트", "🎯 목표", "🌟 추천", "📝 일지"])
+# 💡 목표 탭을 제거하고 4개 탭으로 단순화
+tab1, tab2, tab3, tab4 = st.tabs(["📈 차트", "🧠 리포트", "🌟 추천", "📝 일지"])
 
 # ========================================================
-# TAB 1: 차트 & 종목별 전문 맞춤 AI 분석 리포트
+# TAB 1: 차트
 # ========================================================
 with tab1:
     if data.empty:
@@ -448,7 +447,6 @@ with tab1:
         fig_chart.update_yaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4", size=9))
         st.plotly_chart(fig_chart, use_container_width=True)
 
-        # 💡 [핵심] 전문 종목별 실시간 AI 맞춤 리포트 로직
         active_key = get_active_gemini_key(api_key_input)
         reason_msg, view_msg = generate_chart_analysis(ticker, current_price, delta_pct, rsi_val, mdd_val, active_key, model_name)
 
@@ -500,41 +498,35 @@ with tab2:
         st.markdown(item["content"])
 
 # ========================================================
-# TAB 3: 목표
+# TAB 3: AI 자율 전세계 뉴스 판단 추천
 # ========================================================
 with tab3:
-    with st.expander("⚙️ 설정", expanded=True):
-        c1, c2 = st.columns(2)
-        target_farm = c1.number_input("스마트팜($)", value=300000)
-        target_golf = c2.number_input("골프펀드($)", value=100000)
-        target_living = c1.number_input("생활자금($)", value=600000)
-        current_asset = c2.number_input("현재투자($)", value=10000)
-        annual_return_pct = st.slider("연평균 수익률 (%)", 5, 100, 30)
-
-    total_target = target_farm + target_golf + target_living
-    progress = min((current_asset / total_target) * 100, 100.0) if total_target > 0 else 0
-    st.markdown(f"**목표액:** `${total_target:,.0f}` &nbsp;|&nbsp; **달성:** `{progress:.1f}%`")
-    st.progress(progress / 100)
-
-    years_sim = np.arange(0, 11)
-    target_vals = current_asset * ((1 + annual_return_pct / 100) ** years_sim)
-    fig_sim = go.Figure(go.Scatter(x=years_sim, y=target_vals, mode="lines+markers", line=dict(color="#5B9DF9", width=2)))
-    fig_sim.update_layout(height=240, margin=dict(l=0, r=0, t=20, b=0), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECEFF4"))
-    st.plotly_chart(fig_sim, use_container_width=True)
-
-# ========================================================
-# TAB 4: 추천
-# ========================================================
-with tab4:
-    sector_choice = st.selectbox("분야 선택", ["우주 항공 및 통신", "AI 바이오 헬스케어", "차세대 에너지 (SMR)", "양자 컴퓨팅"])
-    if st.button("✨ 추천받기", use_container_width=True):
+    sector_options = [
+        "🤖 AI 자율 분야 발굴 (최신 글로벌 뉴스 기반)",
+        "우주 항공 및 통신", 
+        "AI 바이오 헬스케어", 
+        "차세대 에너지 (SMR)", 
+        "양자 컴퓨팅"
+    ]
+    sector_choice = st.selectbox("분야 선택", sector_options)
+    
+    if st.button("✨ 텐배거 종목 추천받기", use_container_width=True, type="primary"):
         active_key = get_active_gemini_key(api_key_input)
         if not active_key: 
-            st.error("API 키 필요")
+            st.error("API 키를 입력해 주세요.")
         else:
-            with st.spinner("분석 중..."):
+            with st.spinner("전세계 최신 뉴스 및 산업 동향 실시간 종합 분석 중..."):
                 try: 
-                    res_text = get_ai_text(active_key, model_name, f"현재 시점 {date.today().year}년. '{sector_choice}' 분야 10배 성장 유망 중소형주 3개 요약.")
+                    if sector_choice == "🤖 AI 자율 분야 발굴 (최신 글로벌 뉴스 기반)":
+                        prompt = (
+                            f"현재 {date.today().year}년 최신 글로벌 뉴스, 주요 기술 트렌드 및 주식 시장 동향을 종합적으로 판단하세요.\n"
+                            f"현재 전세계에서 가장 주목받고 있으며 10배(Tenbagger) 성장 모멘텀이 높은 '최우선 유망 산업 분야 1개'를 AI가 직접 선정하고,\n"
+                            f"해당 분야에서 가장 성장이 기대되는 대표 유망 중소형 미국 주식 3개의 [종목코드, 선정이유, 핵심촉매]를 작성해 주세요."
+                        )
+                    else:
+                        prompt = f"현재 시점 {date.today().year}년. '{sector_choice}' 분야 10배 성장 유망 중소형주 3개 요약."
+                        
+                    res_text = get_ai_text(active_key, model_name, prompt)
                     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
                     st.session_state["ai_recommend_cache"][sector_choice] = {
                         "created_at": now_str,
@@ -546,13 +538,13 @@ with tab4:
 
     if sector_choice in st.session_state["ai_recommend_cache"]:
         item = st.session_state["ai_recommend_cache"][sector_choice]
-        st.caption(f"📅 **생성 일시:** `{item['created_at']}`")
+        st.caption(f"📅 **분석 일시:** `{item['created_at']}`")
         st.markdown(item["content"])
 
 # ========================================================
-# TAB 5: 일지
+# TAB 4: 일지
 # ========================================================
-with tab5:
+with tab4:
     def load_journal():
         if os.path.exists(JOURNAL_FILE):
             df = pd.read_csv(JOURNAL_FILE)
