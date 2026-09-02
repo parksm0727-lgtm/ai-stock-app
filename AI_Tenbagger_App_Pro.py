@@ -11,6 +11,7 @@ import numpy as np
 import os
 import uuid
 import json
+import time
 
 # =========================================================
 # [1] 페이지 설정
@@ -47,7 +48,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (하단 넉넉한 여백 + 타이틀 겹침 차단)
+# [3] 디자인 시스템
 # =========================================================
 st.markdown("""
 <style>
@@ -106,14 +107,14 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
 /* 분석 섹션 타이틀 */
 .section-title {
-    font-size: clamp(0.9rem, 4.2vw, 1.3rem) !important;
+    font-size: clamp(0.95rem, 4.2vw, 1.3rem) !important;
     font-weight: 700 !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     color: var(--text) !important;
-    margin-top: 18px !important;
-    margin-bottom: 12px !important;
+    margin-top: 8px !important;
+    margin-bottom: 8px !important;
     display: block !important;
     width: 100% !important;
     line-height: 1.4 !important;
@@ -229,6 +230,7 @@ button[kind="primary"] { background: linear-gradient(135deg, var(--accent) 0%, v
 WATCHLIST_FILE = "watchlist.json"
 REPORT_FILE = "ai_reports.json"
 RECOMMEND_FILE = "ai_recommends.json"
+CHART_ANALYSIS_FILE = "chart_analysis_cache.json"
 DEFAULT_WATCHLIST = ["ASTS", "OKLO", "IONQ", "RXRX", "PLTR", "TSLA"]
 
 def load_json_file(filename, default_val):
@@ -257,12 +259,14 @@ if "ai_report_cache" not in st.session_state:
     st.session_state["ai_report_cache"] = load_json_file(REPORT_FILE, {})
 if "ai_recommend_cache" not in st.session_state:
     st.session_state["ai_recommend_cache"] = load_json_file(RECOMMEND_FILE, {})
+if "chart_analysis_cache" not in st.session_state:
+    st.session_state["chart_analysis_cache"] = load_json_file(CHART_ANALYSIS_FILE, {})
 
 JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & AI 호출 (안전한 모델 선택 로직)
+# [5] 데이터 로딩 & AI 호출
 # =========================================================
 @st.cache_data(ttl=300, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -293,7 +297,6 @@ def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
     m.fit(df_train)
     return m.predict(m.make_future_dataframe(periods=years * 365))
 
-# 💡 계정에서 사용 가능한 유효한 Gemini 모델만 자동 매칭
 def get_valid_models(client: genai.Client) -> list:
     valid_list = []
     try:
@@ -306,7 +309,6 @@ def get_valid_models(client: genai.Client) -> list:
     except Exception:
         pass
     
-    # 최신 우선 순서 정렬
     priority_keywords = ["3.7", "3.6", "3.0", "2.0", "flash"]
     sorted_models = []
     for kw in priority_keywords:
@@ -318,7 +320,6 @@ def get_valid_models(client: genai.Client) -> list:
         if m_name not in sorted_models:
             sorted_models.append(m_name)
             
-    # 기본 안전 폴백 추가 (404 예외 모델 제거)
     fallback_defaults = ["gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro"]
     for fb in fallback_defaults:
         if fb not in sorted_models:
@@ -348,35 +349,7 @@ def get_ai_text(api_key: str, preferred_model: str, prompt: str) -> str:
 def get_active_gemini_key(sidebar_key: str) -> str:
     return sidebar_key or os.environ.get("GEMINI_API_KEY", "")
 
-# 💡 초전문가용 다차원 주가 분석 알고리즘
-@st.cache_data(ttl=1800, show_spinner=False)
-def generate_chart_analysis(t: str, cur_price: float, delta_pct: float, rsi: float, mdd: float, api_key: str, model_n: str) -> tuple:
-    if api_key:
-        prompt = (
-            f"당신은 글로벌 헤지펀드의 수석 퀀트 및 펀더멘털 분석가입니다. {date.today().year}년 현재 시점 미주 종목 '{t}'를 입체 분석해주세요.\n"
-            f"- 현재가: ${cur_price:.2f} (전일대비 {delta_pct:+.2f}%)\n"
-            f"- RSI(14): {rsi:.0f}, MDD: {mdd:.1f}%\n\n"
-            f"다음 2가지 구조로 다방면의 초전문가적 분석 결과를 작성하세요.\n\n"
-            f"[원인]\n"
-            f"• 펀더멘털 & 산업: {t}의 핵심 기술 경쟁력 및 사업 성장 이슈\n"
-            f"• 수급 & 퀀트: 기술적 파동 및 RSI({rsi:.0f}), MDD({mdd:.1f}%) 수급 메커니즘\n\n"
-            f"[관점]\n"
-            f"• 시클리컬 전망: Prophet AI 궤적 및 거시 구조 전망\n"
-            f"• 트레이딩 전략: 지지/저항 및 타깃/손절 매매 전략\n\n"
-            f"구체적인 전문 어휘를 사용하여 작성하고, 반드시 '[원인]'과 '[관점]' 태그를 지켜주세요."
-        )
-        try:
-            res = get_ai_text(api_key, model_n, prompt)
-            reason_p, view_p = "", ""
-            if "[원인]" in res and "[관점]" in res:
-                parts = res.split("[관점]")
-                reason_p = parts[0].replace("[원인]", "").strip()
-                view_p = parts[1].strip()
-            if reason_p and view_p:
-                return reason_p, view_p
-        except Exception:
-            pass
-
+def get_fallback_expert_analysis(t: str, delta_pct: float, rsi: float, mdd: float) -> tuple:
     expert_profiles = {
         "ASTS": (
             f"• <b>펀더멘털 & 산업</b>: 저궤도(LEO) Direct-to-Cell 위성 통신망 구축 및 글로벌 MNO(AT&T, Verizon) 파트너십 상용화 기대감이 상방 모멘텀을 이끕니다.<br><br>"
@@ -428,6 +401,53 @@ def generate_chart_analysis(t: str, cur_price: float, delta_pct: float, rsi: flo
         f"• <b>트레이딩 전략</b>: 주요 마디가 지지 여부를 확인 후 위험 대비 보상 비율을 고려한 분할 접근이 적합합니다."
     )
     return default_reason, default_view
+
+def get_chart_analysis_with_1hr_cache(t: str, cur_price: float, delta_pct: float, rsi: float, mdd: float, api_key: str, model_n: str, force_refresh: bool = False) -> tuple:
+    cache = st.session_state["chart_analysis_cache"]
+    now_ts = time.time()
+    
+    if not force_refresh and t in cache:
+        item = cache[t]
+        last_ts = item.get("timestamp", 0)
+        if now_ts - last_ts < 3600:
+            return item["reason"], item["view"], item["created_at"], False
+
+    reason_msg, view_msg = "", ""
+    if api_key:
+        prompt = (
+            f"당신은 글로벌 헤지펀드의 수석 퀀트 및 펀더멘털 분석가입니다. {date.today().year}년 현재 시점 미주 종목 '{t}'를 입체 분석해주세요.\n"
+            f"- 현재가: ${cur_price:.2f} (전일대비 {delta_pct:+.2f}%)\n"
+            f"- RSI(14): {rsi:.0f}, MDD: {mdd:.1f}%\n\n"
+            f"다음 2가지 구조로 다방면의 초전문가적 분석 결과를 작성하세요.\n\n"
+            f"[원인]\n"
+            f"• 펀더멘털 & 산업: {t}의 핵심 기술 경쟁력 및 사업 성장 이슈\n"
+            f"• 수급 & 퀀트: 기술적 파동 및 RSI({rsi:.0f}), MDD({mdd:.1f}%) 수급 메커니즘\n\n"
+            f"[관점]\n"
+            f"• 시클리컬 전망: Prophet AI 궤적 및 거시 구조 전망\n"
+            f"• 트레이딩 전략: 지지/저항 및 타깃/손절 매매 전략\n\n"
+            f"구체적인 전문 어휘를 사용하여 작성하고, 반드시 '[원인]'과 '[관점]' 태그를 지켜주세요."
+        )
+        try:
+            res = get_ai_text(api_key, model_n, prompt)
+            if "[원인]" in res and "[관점]" in res:
+                parts = res.split("[관점]")
+                reason_msg = parts[0].replace("[원인]", "").strip()
+                view_msg = parts[1].strip()
+        except Exception:
+            pass
+
+    if not reason_msg or not view_msg:
+        reason_msg, view_msg = get_fallback_expert_analysis(t, delta_pct, rsi, mdd)
+
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    cache[t] = {
+        "timestamp": now_ts,
+        "created_at": now_str,
+        "reason": reason_msg,
+        "view": view_msg
+    }
+    save_json_file(CHART_ANALYSIS_FILE, cache)
+    return reason_msg, view_msg, now_str, True
 
 def render_mini_grid(cards: list):
     parts = []
@@ -540,16 +560,24 @@ with tab1:
         st.plotly_chart(fig_chart, use_container_width=True)
 
         active_key = get_active_gemini_key(api_key_input)
-        reason_msg, view_msg = generate_chart_analysis(ticker, current_price, delta_pct, rsi_val, mdd_val, active_key, model_name)
+
+        st.markdown("---")
+        
+        # 💡 [직관적인 전면 수동 재분석 버튼]
+        st.markdown(f'<div class="section-title">📊 {ticker} 입체 주가 분석</div>', unsafe_allow_html=True)
+        force_run = st.button("🔄 AI 즉시 수동 재분석", type="primary", use_container_width=True)
+
+        reason_msg, view_msg, created_at_str, was_updated = get_chart_analysis_with_1hr_cache(
+            ticker, current_price, delta_pct, rsi_val, mdd_val, active_key, model_name, force_refresh=force_run
+        )
 
         reason_msg_html = reason_msg.replace("**", "<b>").replace("**", "</b>").replace("\n", "<br>")
         view_msg_html = view_msg.replace("**", "<b>").replace("**", "</b>").replace("\n", "<br>")
 
         trend_desc = "상승 강세" if delta >= 0 else "하락 조정"
-        st.markdown("---")
         
-        st.markdown(f'<div class="section-title">📊 {ticker} 입체 주가 분석 및 시나리오</div>', unsafe_allow_html=True)
-        
+        st.caption(f"📅 **마지막 분석 완료:** `{created_at_str}` (자동 재분석 주기: 1시간)")
+
         st.markdown(f"""
         <div class="analysis-card">
             <div class="analysis-card-title">1. 현재 차트 및 핵심 지표</div>
