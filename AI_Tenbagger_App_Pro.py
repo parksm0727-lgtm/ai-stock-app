@@ -49,7 +49,7 @@ def ensure_theme_config():
 ensure_theme_config()
 
 # =========================================================
-# [3] 디자인 시스템 (이미지 스타일 타이틀 반영)
+# [3] 디자인 시스템
 # =========================================================
 st.markdown("""
 <style>
@@ -62,10 +62,10 @@ st.markdown("""
     --border: #262F45;
     --text: #ECEFF4;
     --text-muted: #8A94AC;
-    --accent: #F59E0B;       /* 주황~황금 테마 포인트 */
+    --accent: #F59E0B;
     --accent-strong: #D97706;
-    --up: #F87171;           /* 상승: 빨간색 */
-    --down: #60A5FA;         /* 하락: 파란색 */
+    --up: #F87171;
+    --down: #60A5FA;
     --radius: 8px;
 }
 
@@ -84,7 +84,6 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     max-width: 720px !important;
 }
 
-/* 💡 요청하신 이미지 스타일 메인 타이틀 배너 */
 .title-banner-container {
     background: linear-gradient(180deg, #1A1F2C 0%, #0F1420 100%);
     border: 1.5px solid #F59E0B;
@@ -117,7 +116,6 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     opacity: 0.95;
 }
 
-/* 분석 섹션 타이틀 */
 .section-title {
     font-size: clamp(0.95rem, 4.2vw, 1.3rem) !important;
     font-weight: 700 !important;
@@ -132,7 +130,6 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     line-height: 1.4 !important;
 }
 
-/* 분석 내용 카드 스타일 */
 .analysis-card {
     background-color: var(--surface);
     border: 1px solid var(--border);
@@ -154,7 +151,6 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     color: #DDE1E8;
 }
 
-/* 배지 스타일 및 항목 디자인 */
 .sub-badge {
     display: inline-block;
     background-color: #271E10;
@@ -188,6 +184,17 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     color: var(--text);
 }
 .hero-delta { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 600; margin-top: 2px; }
+
+.price-reason-box {
+    background-color: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-top: 4px;
+    margin-bottom: 8px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
 
 .mini-grid {
     display: grid;
@@ -312,14 +319,18 @@ def load_price_data(t: str) -> pd.DataFrame:
             return pd.DataFrame()
         data.reset_index(inplace=True)
         data["Date"] = pd.to_datetime(data["Date"]).dt.tz_localize(None)
+        data = data.dropna(subset=["Close"]).reset_index(drop=True)
         return data
     except Exception:
         return pd.DataFrame()
 
 @st.cache_data(ttl=300, show_spinner=False)
 def is_valid_ticker(t: str) -> bool:
-    try: return not yf.Ticker(t).history(period="5d").empty
-    except: return False
+    try: 
+        df = yf.Ticker(t).history(period="5d")
+        return not df.empty and not df["Close"].isna().all()
+    except: 
+        return False
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def load_news(t: str) -> list:
@@ -521,7 +532,7 @@ with st.sidebar:
     model_name = st.text_input("Gemini 모델명 (기본: 자동 탐색)", value="auto")
 
 # =========================================================
-# [7] 메인 타이틀 배너 (이미지 디자인 완벽 반영)
+# [7] 메인 타이틀 배너
 # =========================================================
 st.markdown("""
 <div class="title-banner-container">
@@ -568,38 +579,46 @@ tab1, tab2, tab3, tab4 = st.tabs(["📈 차트", "🧠 리포트", "🌟 추천"
 # TAB 1: 차트 분석
 # ========================================================
 with tab1:
-    if data.empty:
-        st.error(f"'{ticker}' 최신 데이터를 불러올 수 없습니다. 종목 코드를 확인해주세요.")
+    if data.empty or "Close" not in data.columns or data["Close"].dropna().empty:
+        st.error(f"'{ticker}' 최신 데이터를 불러올 수 없습니다. 인터넷 연결을 확인하시거나 잠시 후 다시 시도해 주세요.")
     else:
-        data["RSI"] = RSIIndicator(close=data["Close"], window=14).rsi()
-        current_price = float(data["Close"].iloc[-1])
-        prev_close = float(data["Close"].iloc[-2]) if len(data) > 1 else current_price
+        clean_close = data["Close"].dropna()
+        current_price = float(clean_close.iloc[-1])
+        prev_close = float(clean_close.iloc[-2]) if len(clean_close) > 1 else current_price
         delta = current_price - prev_close
         delta_pct = (delta / prev_close * 100) if prev_close else 0.0
         
         delta_color = "var(--up)" if delta >= 0 else "var(--down)"
         
+        # 가격 기준 및 이유 안내
+        price_status_label = "최근 마감 종가 기준"
+        price_reason_desc = "미국 증시 마감 또는 휴장 상태로 인해 직전 거래일의 확정 종가 및 등락률이 표시됩니다."
+
         st.markdown(
-            f'<div class="hero-price"><div class="hero-label">{ticker} 최신가</div>'
+            f'<div class="hero-price">'
+            f'<div class="hero-label">{ticker} 가격 <span style="font-size:0.65rem; color:#F59E0B; background:#271E10; padding:1px 5px; border-radius:4px; margin-left:4px; border:1px solid #78350F;">{price_status_label}</span></div>'
             f'<div class="hero-value">${current_price:,.2f}</div>'
-            f'<div class="hero-delta" style="color:{delta_color};">{"▲" if delta >= 0 else "▼"} {abs(delta):,.2f} ({abs(delta_pct):.2f}%)</div></div>',
+            f'<div class="hero-delta" style="color:{delta_color};">{"▲" if delta >= 0 else "▼"} {abs(delta):,.2f} ({abs(delta_pct):.2f}%)</div>'
+            f'</div>'
+            f'<div class="price-reason-box">ℹ️ <b>가격 표시 안내:</b> {price_reason_desc}</div>',
             unsafe_allow_html=True,
         )
 
-        rsi_val = data["RSI"].iloc[-1]
+        data["RSI"] = RSIIndicator(close=data["Close"], window=14).rsi()
+        rsi_val = float(data["RSI"].dropna().iloc[-1]) if not data["RSI"].dropna().empty else 50.0
         rsi_state = "과매수" if rsi_val >= 70 else ("과매도" if rsi_val <= 30 else "중립")
-        mdd_val = (data['Close'] / data['Close'].cummax() - 1.0).min() * 100
+        mdd_val = float((data['Close'] / data['Close'].cummax() - 1.0).min() * 100)
 
         rsi_tag_color = "var(--up)" if rsi_state == "과매수" else ("var(--down)" if rsi_state == "과매도" else "var(--text-muted)")
 
         render_mini_grid([
             {"label": "RSI(14)", "value": f"{rsi_val:.0f}", "tag": rsi_state, "tag_color": rsi_tag_color},
             {"label": "MDD", "value": f"{mdd_val:.1f}%"},
-            {"label": "52주 최고가", "value": f"${data['Close'].tail(252).max():,.1f}"},
+            {"label": "52주 최고가", "value": f"${clean_close.tail(252).max():,.1f}"},
         ])
 
         years = st.slider("미래 예측 기간 (년)", 1, 5, 2, label_visibility="collapsed")
-        df_train = data[["Date", "Close"]].copy().rename(columns={"Date": "ds", "Close": "y"})
+        df_train = data[["Date", "Close"]].dropna().copy().rename(columns={"Date": "ds", "Close": "y"})
         
         with st.spinner("예측 중..."):
             forecast = run_forecast(df_train, years)
@@ -734,7 +753,7 @@ with tab3:
         st.markdown(item["content"])
 
 # ========================================================
-# TAB 4: 일지 (수정/삭제 시 즉시 자동 저장 구조)
+# TAB 4: 일지
 # ========================================================
 with tab4:
     def load_journal():
@@ -774,7 +793,6 @@ with tab4:
             column_config={"ID": st.column_config.TextColumn(disabled=True)}
         )
         
-        # 수정/삭제 자동 반영 로직
         other_rows = df_journal[df_journal["Ticker"] != ticker]
         current_combined = pd.concat([other_rows, edited_df], ignore_index=True)
         
