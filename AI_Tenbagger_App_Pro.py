@@ -189,11 +189,12 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     background-color: var(--surface);
     border: 1px dashed var(--border);
     border-radius: 6px;
-    padding: 6px 10px;
+    padding: 8px 10px;
     margin-top: 4px;
     margin-bottom: 8px;
     font-size: 0.75rem;
     color: var(--text-muted);
+    line-height: 1.5;
 }
 
 .mini-grid {
@@ -590,9 +591,10 @@ with tab1:
         
         delta_color = "var(--up)" if delta >= 0 else "var(--down)"
         
-        # 가격 기준 및 이유 안내
-        price_status_label = "최근 마감 종가 기준"
-        price_reason_desc = "미국 증시 마감 또는 휴장 상태로 인해 직전 거래일의 확정 종가 및 등락률이 표시됩니다."
+        # 💡 정확한 마감 날짜 추출 (데이터프레임 마지막 행의 날짜)
+        last_date_str = pd.to_datetime(data["Date"].iloc[-1]).strftime('%Y-%m-%d')
+        price_status_label = f"{last_date_str} 마감 종가 기준"
+        price_reason_desc = f"야후 파이낸스에서 수신된 <b>{last_date_str}</b> 일자 확정 마감 종가입니다. 네이버 증권이나 구글 파이낸스의 해당일 종가와 비교하여 정확성을 직접 검증하실 수 있습니다."
 
         st.markdown(
             f'<div class="hero-price">'
@@ -600,7 +602,7 @@ with tab1:
             f'<div class="hero-value">${current_price:,.2f}</div>'
             f'<div class="hero-delta" style="color:{delta_color};">{"▲" if delta >= 0 else "▼"} {abs(delta):,.2f} ({abs(delta_pct):.2f}%)</div>'
             f'</div>'
-            f'<div class="price-reason-box">ℹ️ <b>가격 표시 안내:</b> {price_reason_desc}</div>',
+            f'<div class="price-reason-box">🔍 <b>데이터 검증 안내:</b> {price_reason_desc}</div>',
             unsafe_allow_html=True,
         )
 
@@ -659,7 +661,7 @@ with tab1:
             <div class="analysis-card-title">1. 현재 차트 및 핵심 지표</div>
             <div class="analysis-card-content">
                 <div class="sub-badge">지표 동향</div>
-                <div class="sub-item">• <b>현재가</b>: ${current_price:,.2f} (전일 대비 {delta_pct:+.2f}% {trend_desc})</div>
+                <div class="sub-item">• <b>현재가</b>: ${current_price:,.2f} ({last_date_str} 기준, 전일 대비 {delta_pct:+.2f}% {trend_desc})</div>
                 <div class="sub-item">• <b>RSI 지표</b>: {rsi_val:.0f} ({rsi_state} 구간)</div>
                 <div class="sub-item">• <b>52주 최고가 대비 낙폭(MDD)</b>: {mdd_val:.1f}%</div>
             </div>
