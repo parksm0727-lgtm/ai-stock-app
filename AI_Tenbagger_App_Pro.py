@@ -452,8 +452,8 @@ def format_ai_content_to_html(text: str) -> str:
             
         line_str = line_str.replace("**", "<b>").replace("**", "</b>")
         
-        if line_str.startswith("•") or line_str.startswith("*"):
-            title_text = line_str.lstrip("•* ").strip()
+        if line_str.startswith("•") or line_str.startswith("*") or line_str.startswith("1.") or line_str.startswith("2.") or line_str.startswith("3.") or line_str.startswith("4.") or line_str.startswith("5."):
+            title_text = line_str.lstrip("•*12345. ").strip()
             formatted_lines.append(f'<div class="sub-badge">{title_text}</div>')
         elif line_str.startswith("-"):
             item_text = line_str.lstrip("- ").strip()
@@ -591,7 +591,6 @@ with tab1:
         
         delta_color = "var(--up)" if delta >= 0 else "var(--down)"
         
-        # 💡 정확한 마감 날짜 추출 (데이터프레임 마지막 행의 날짜)
         last_date_str = pd.to_datetime(data["Date"].iloc[-1]).strftime('%Y-%m-%d')
         price_status_label = f"{last_date_str} 마감 종가 기준"
         price_reason_desc = f"야후 파이낸스에서 수신된 <b>{last_date_str}</b> 일자 확정 마감 종가입니다. 네이버 증권이나 구글 파이낸스의 해당일 종가와 비교하여 정확성을 직접 검증하실 수 있습니다."
@@ -679,21 +678,35 @@ with tab1:
         """, unsafe_allow_html=True)
 
 # ========================================================
-# TAB 2: AI 리포트
+# TAB 2: AI 리포트 (전문가 딥다이브 마스터 분석 기능)
 # ========================================================
 with tab2:
+    st.markdown(f'<div class="section-title">🧠 {ticker} 전문가 딥다이브 심층 분석</div>', unsafe_allow_html=True)
+    st.markdown('<div class="price-reason-box">🎯 월가 수석 애널리스트 및 펀드매니저 관점에서 경영진, 경쟁 해자, 재무 구조, 매크로 리스크 및 텐배거 촉매를 정밀 진단합니다.</div>', unsafe_allow_html=True)
+    
     active_key = get_active_gemini_key(api_key_input)
-    if st.button("🔥 AI 심층 리포트 생성", use_container_width=True, type="primary"):
+    if st.button("🔥 전문가 심층 분석 리포트 생성", use_container_width=True, type="primary"):
         if not active_key:
-            st.error("API 키를 입력해 주세요.")
+            st.error("Gemini API 키를 사이드바에 입력해 주세요.")
         else:
-            with st.spinner("분석 중..."):
+            with st.spinner(f"전문가 애널리스트 모드로 '{ticker}' 심층 분석 리포트를 작성 중입니다..."):
                 recent_news = load_news(ticker)[:10]
                 news_items = [f"- {item.get('content', {}).get('title') or item.get('title', '제목 없음')}" for item in recent_news]
                 news_text = "\n".join(news_items) if news_items else "최신 뉴스가 없습니다."
-                prompt = f"현재 {date.today().year}년 기준. 종목 '{ticker}' 관련 뉴스:\n{news_text}\n핵심 단기 촉매와 리스크 요약."
+                
+                expert_prompt = (
+                    f"당신은 글로벌 탑티어 헤지펀드의 수석 테크/성장주 애널리스트입니다. {date.today().year}년 현재 시점 미주 종목 '{ticker}'에 대해 최고 수준의 전문가적 심층 딥다이브 리포트를 작성해주세요.\n\n"
+                    f"최신 뉴스 참고:\n{news_text}\n\n"
+                    f"반드시 다음 5가지 핵심 영역을 깊이 있게 나누어 상세히 분석하세요:\n\n"
+                    f"1. CEO 및 경영진 비전 평가\n"
+                    f"2. 시장 침투율 및 경쟁 해자(Moat)\n"
+                    f"3. 재무 건전성 및 밸류에이션(멀티플) 타당성\n"
+                    f"4. 거시경제 및 리스크 스트레스 테스트\n"
+                    f"5. 10배 성장(텐배거) 핵심 촉매 및 마일스톤\n\n"
+                    f"각 항목별로 번호나 기호를 붙이고, 구체적이고 전문적인 어휘를 사용하여 상세하고 깊이 있게 작성해주세요."
+                )
                 try: 
-                    res_text = get_ai_text(active_key, model_name, prompt)
+                    res_text = get_ai_text(active_key, model_name, expert_prompt)
                     now_kst_str = get_kst_now_str()
                     st.session_state["ai_report_cache"][ticker] = {
                         "created_at": now_kst_str,
@@ -702,12 +715,20 @@ with tab2:
                     save_json_file(REPORT_FILE, st.session_state["ai_report_cache"])
                     st.rerun()
                 except Exception as e: 
-                    st.error(f"오류 발생: {e}")
+                    st.error(f"분석 중 오류 발생: {e}")
 
     if ticker in st.session_state["ai_report_cache"]:
         item = st.session_state["ai_report_cache"][ticker]
-        st.caption(f"📅 **생성 일시 (KST):** `{item['created_at']}`")
-        st.markdown(item["content"])
+        st.caption(f"📅 **전문가 딥다이브 분석 완료 일시 (KST):** `{item['created_at']}`")
+        
+        # HTML 가공 처리하여 보기 좋게 렌더링
+        formatted_report = format_ai_content_to_html(item["content"])
+        st.markdown(f"""
+        <div class="analysis-card">
+            <div class="analysis-card-title">💡 {ticker} 프로페셔널 딥다이브 리포트</div>
+            <div class="analysis-card-content">{formatted_report}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 # ========================================================
 # TAB 3: AI 자율 추천
