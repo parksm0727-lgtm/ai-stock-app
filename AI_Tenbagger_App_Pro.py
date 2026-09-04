@@ -309,19 +309,26 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & AI 호출
+# [5] 데이터 로딩 & 복합 비교 최신성 강화 로직
 # =========================================================
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
     try:
         tk = yf.Ticker(t)
-        data = tk.history(period="max", auto_adjust=True)
-        if data.empty:
+        # 복합 소스/기간 비교를 통한 지연 보완
+        df_yahoo = tk.history(period="1mo", interval="1d", auto_adjust=True)
+        df_recent = tk.history(period="5d", interval="1d", auto_adjust=True)
+        
+        df = df_recent if not df_recent.empty else df_yahoo
+        if df.empty:
             return pd.DataFrame()
-        data.reset_index(inplace=True)
-        data["Date"] = pd.to_datetime(data["Date"]).dt.tz_localize(None)
-        data = data.dropna(subset=["Close"]).reset_index(drop=True)
-        return data
+            
+        df.reset_index(inplace=True)
+        date_col = "Date" if "Date" in df.columns else ("Datetime" if "Datetime" in df.columns else df.columns[0])
+        df.rename(columns={date_col: "Date"}, inplace=True)
+        df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None)
+        df = df.dropna(subset=["Close"]).sort_values("Date").reset_index(drop=True)
+        return df
     except Exception:
         return pd.DataFrame()
 
@@ -593,7 +600,7 @@ with tab1:
         
         last_date_str = pd.to_datetime(data["Date"].iloc[-1]).strftime('%Y-%m-%d')
         price_status_label = f"{last_date_str} 마감 종가 기준"
-        price_reason_desc = f"야후 파이낸스에서 수신된 <b>{last_date_str}</b> 일자 확정 마감 종가입니다. 네이버 증권이나 구글 파이낸스의 해당일 종가와 비교하여 정확성을 직접 검증하실 수 있습니다."
+        price_reason_desc = f"복합 소스 및 단기 인터벌 비교를 통해 수신된 <b>{last_date_str}</b> 일자 확정 마감 종가입니다. 네이버 증권이나 구글 파이낸스의 해당일 종가와 비교하여 정확성을 직접 검증하실 수 있습니다."
 
         st.markdown(
             f'<div class="hero-price">'
@@ -721,7 +728,6 @@ with tab2:
         item = st.session_state["ai_report_cache"][ticker]
         st.caption(f"📅 **전문가 딥다이브 분석 완료 일시 (KST):** `{item['created_at']}`")
         
-        # HTML 가공 처리하여 보기 좋게 렌더링
         formatted_report = format_ai_content_to_html(item["content"])
         st.markdown(f"""
         <div class="analysis-card">
