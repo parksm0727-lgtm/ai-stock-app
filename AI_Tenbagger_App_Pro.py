@@ -264,7 +264,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 """, unsafe_allow_html=True)
 
 # =========================================================
-# [4] 파일 기반 영구 저장소
+# [4] 영구 저장소 (쿼리 파라미터 + 파일 이중 연동)
 # =========================================================
 WATCHLIST_FILE = "watchlist.json"
 REPORT_FILE = "ai_reports.json"
@@ -292,8 +292,25 @@ def get_kst_now_str():
     kst = pytz.timezone('Asia/Seoul')
     return datetime.now(kst).strftime("%Y-%m-%d %H:%M")
 
+# 관심 종목 복원 로직 (URL 파라미터 > 파일 > 기본값)
 if "watchlist" not in st.session_state:
-    st.session_state["watchlist"] = load_json_file(WATCHLIST_FILE, DEFAULT_WATCHLIST.copy())
+    query_wl = st.query_params.get("watchlist")
+    if query_wl:
+        if isinstance(query_wl, str):
+            st.session_state["watchlist"] = [item.strip() for item in query_wl.split(",") if item.strip()]
+        else:
+            st.session_state["watchlist"] = list(query_wl)
+    else:
+        loaded_wl = load_json_file(WATCHLIST_FILE, DEFAULT_WATCHLIST.copy())
+        st.session_state["watchlist"] = loaded_wl
+
+def update_watchlist_persistence(new_list):
+    st.session_state["watchlist"] = new_list
+    save_json_file(WATCHLIST_FILE, new_list)
+    try:
+        st.query_params["watchlist"] = ",".join(new_list)
+    except Exception:
+        pass
 
 if "current_ticker" not in st.session_state or st.session_state["current_ticker"] not in st.session_state["watchlist"]:
     st.session_state["current_ticker"] = st.session_state["watchlist"][0]
@@ -309,13 +326,12 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & 복합 비교 최신성 강화 로직
+# [5] 데이터 로딩 & 예측 안정화 함수
 # =========================================================
 @st.cache_data(ttl=60, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
     try:
         tk = yf.Ticker(t)
-        # 복합 소스/기간 비교를 통한 지연 보완
         df_yahoo = tk.history(period="1mo", interval="1d", auto_adjust=True)
         df_recent = tk.history(period="5d", interval="1d", auto_adjust=True)
         
@@ -347,9 +363,20 @@ def load_news(t: str) -> list:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
-    m = Prophet(daily_seasonality=False)
+    m = Prophet(daily_seasonality=False, weekly_seasonality=True, yearly_seasonality=True)
     m.fit(df_train)
-    return m.predict(m.make_future_dataframe(periods=years * 365))
+    future = m.make_future_dataframe(periods=years * 365)
+    forecast = m.predict(future)
+    
+    # 예측값 왜곡 방지 클리핑 (최근 주가의 최대 4배를 넘지 않도록 상한 캡 설정하여 그래프 휨 현상 방지)
+    max_y = df_train["y"].max()
+    forecast["yhat"] = forecast["yhat"].clip(lower=0, upper=max_y * 4.0)
+    if "yhat_lower" in forecast.columns:
+        forecast["yhat_lower"] = forecast["yhat_lower"].clip(lower=0, upper=max_y * 4.0)
+    if "yhat_upper" in forecast.columns:
+        forecast["yhat_upper"] = forecast["yhat_upper"].clip(lower=0, upper=max_y * 4.0)
+        
+    return forecast
 
 def get_valid_models(client: genai.Client) -> list:
     valid_list = []
@@ -564,19 +591,22 @@ with st.expander("➕ 종목 관리"):
     new_ticker = st.text_input("새 종목 코드 추가", placeholder="예: NVDA", label_visibility="collapsed")
     if st.button("종목 추가", use_container_width=True):
         t = new_ticker.upper().strip()
-        if t and is_valid_ticker(t) and t not in st.session_state["watchlist"]:
-            st.session_state["watchlist"].append(t)
+        current_wl = st.session_state["watchlist"]
+        if t and is_valid_ticker(t) and t not in current_wl:
+            new_wl = current_wl + [t]
+            update_watchlist_persistence(new_wl)
             st.session_state["current_ticker"] = t
-            save_json_file(WATCHLIST_FILE, st.session_state["watchlist"])
             st.rerun()
 
     del_ticker = st.selectbox("삭제할 종목 선택", st.session_state["watchlist"], key="del_ticker_main", label_visibility="collapsed")
     if st.button("종목 삭제", use_container_width=True, disabled=len(st.session_state["watchlist"]) <= 1):
-        st.session_state["watchlist"].remove(del_ticker)
-        if st.session_state["current_ticker"] == del_ticker: 
-            st.session_state["current_ticker"] = st.session_state["watchlist"][0]
-        save_json_file(WATCHLIST_FILE, st.session_state["watchlist"])
-        st.rerun()
+        current_wl = st.session_state["watchlist"].copy()
+        if del_ticker in current_wl:
+            current_wl.remove(del_ticker)
+            update_watchlist_persistence(current_wl)
+            if st.session_state["current_ticker"] == del_ticker: 
+                st.session_state["current_ticker"] = current_wl[0]
+            st.rerun()
 
 with st.spinner("최신 주가 데이터 로딩 중..."):
     data = load_price_data(ticker)
@@ -685,7 +715,7 @@ with tab1:
         """, unsafe_allow_html=True)
 
 # ========================================================
-# TAB 2: AI 리포트 (전문가 딥다이브 마스터 분석 기능)
+# TAB 2: AI 리포트
 # ========================================================
 with tab2:
     st.markdown(f'<div class="section-title">🧠 {ticker} 전문가 딥다이브 심층 분석</div>', unsafe_allow_html=True)
