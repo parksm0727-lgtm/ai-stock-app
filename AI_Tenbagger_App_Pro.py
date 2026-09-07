@@ -319,7 +319,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & 몬테카를로 시뮬레이션 엔진
+# [5] 데이터 로딩 & 안전한 몬테카를로 시뮬레이션 엔진
 # =========================================================
 @st.cache_data(ttl=60, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -363,11 +363,15 @@ def load_news(t: str) -> list:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def run_monte_carlo_simulation(df_train: pd.DataFrame, years: int, num_simulations: int = 300) -> tuple:
-    """헤지펀드 스타일 몬테카를로 확률 분포 팬 차트 생성기 (기하 브라운 운동 기반)"""
+    """안전 장치가 포함된 몬테카를로 확률 분포 팬 차트 생성기"""
+    if df_train.empty or "Close" not in df_train.columns or len(df_train) < 2:
+        dummy_dates = pd.bdate_range(start=date.today(), periods=years * 252)
+        return dummy_dates, np.ones(len(dummy_dates))*100, np.ones(len(dummy_dates))*100, np.ones(len(dummy_dates))*100
+
     prices = df_train["Close"].values
     log_returns = np.log(prices[1:] / prices[:-1])
-    mu = np.mean(log_returns)
-    sigma = np.std(log_returns)
+    mu = np.mean(log_returns) if len(log_returns) > 0 else 0.0
+    sigma = np.std(log_returns) if len(log_returns) > 0 and np.std(log_returns) > 0 else 0.02
     
     num_days = years * 252
     last_price = prices[-1]
@@ -381,11 +385,10 @@ def run_monte_carlo_simulation(df_train: pd.DataFrame, years: int, num_simulatio
     diffusion = sigma * np.sqrt(dt) * shock
     
     paths = np.zeros((num_days, num_simulations))
-    paths[0] = last_price * np.exp(drift[0] + diffusion[0])
+    paths[0] = last_price * np.exp(drift + diffusion[0])
     for t in range(1, num_days):
         paths[t] = paths[t-1] * np.exp(drift + diffusion[t])
         
-    # 하위 10%, 중앙값(50%), 상위 90% 확률 띠 계산
     p10 = np.percentile(paths, 10, axis=1)
     p50 = np.percentile(paths, 50, axis=1)
     p90 = np.percentile(paths, 90, axis=1)
@@ -602,7 +605,7 @@ with st.spinner("최신 주가 데이터 로딩 중..."):
 tab1, tab2, tab3, tab4 = st.tabs(["📈 차트", "🧠 리포트", "🌟 추천", "📝 일지"])
 
 # ========================================================
-# TAB 1: 전문가용 퀀트 차트 분석 (볼린저밴드 + 몬테카를로 + MACD)
+# TAB 1: 전문가용 퀀트 차트 분석
 # ========================================================
 with tab1:
     if data.empty or "Close" not in data.columns or data["Close"].dropna().empty:
@@ -630,7 +633,6 @@ with tab1:
             unsafe_allow_html=True,
         )
 
-        # 기술적 지표 계산 (RSI, Bollinger Bands, MACD)
         data["RSI"] = RSIIndicator(close=data["Close"], window=14).rsi()
         rsi_val = float(data["RSI"].dropna().iloc[-1]) if not data["RSI"].dropna().empty else 50.0
         rsi_state = "과매수" if rsi_val >= 70 else ("과매도" if rsi_val <= 30 else "중립")
@@ -659,22 +661,17 @@ with tab1:
         with st.spinner("확률 분포 시뮬레이션 계산 중..."):
             mc_dates, p10, p50, p90 = run_monte_carlo_simulation(data, years)
 
-        # 전문가용 프로페셔널 서브플롯 구성 (Row 1: 주가 + 볼린저밴드 + 확률 범위 띠 / Row 2: MACD 히스토그램)
         fig_chart = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.75, 0.25], vertical_spacing=0.03)
         
-        # 실제 주가 선 & 점
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["Close"], mode="lines+markers", line=dict(color="#94A3B8", width=1.5), marker=dict(color="#94A3B8", size=3), name="실제 주가"), row=1, col=1)
         
-        # 볼린저 밴드 상/하단
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["bb_high"], mode="lines", line=dict(color="rgba(96, 165, 250, 0.3)", width=1), name="BB 상단"), row=1, col=1)
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["bb_low"], mode="lines", line=dict(color="rgba(96, 165, 250, 0.3)", width=1), fill='tonexty', fillcolor="rgba(96, 165, 250, 0.05)", name="BB 하단"), row=1, col=1)
 
-        # 몬테카를로 확률 팬 차트 (상위 90% ~ 하위 10% 신뢰 구간 띠)
         fig_chart.add_trace(go.Scatter(x=mc_dates, y=p90, mode="lines", line=dict(color="rgba(244, 63, 94, 0.2)", width=1), name="확률 상한 (90%)"), row=1, col=1)
         fig_chart.add_trace(go.Scatter(x=mc_dates, y=p10, mode="lines", line=dict(color="rgba(244, 63, 94, 0.2)", width=1), fill='tonexty', fillcolor="rgba(244, 63, 94, 0.08)", name="확률 하한 (10%)"), row=1, col=1)
         fig_chart.add_trace(go.Scatter(x=mc_dates, y=p50, mode="lines", line=dict(color="#F43F5E", width=2, dash="dash"), name="확률 중앙값 (P50)"), row=1, col=1)
 
-        # 하단 지표: MACD 히스토그램
         colors = ['#F87171' if val >= 0 else '#60A5FA' for val in data["macd_diff"]]
         fig_chart.add_trace(go.Bar(x=data["Date"], y=data["macd_diff"], marker_color=colors, name="MACD Diff"), row=2, col=1)
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["macd"], mode="lines", line=dict(color="#F59E0B", width=1), name="MACD"), row=2, col=1)
