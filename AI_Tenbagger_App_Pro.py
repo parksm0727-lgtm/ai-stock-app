@@ -318,16 +318,27 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & 예측 함수
+# [5] 데이터 로딩 & 예측 함수 (과거 데이터 소실 오류 해결)
 # =========================================================
 @st.cache_data(ttl=60, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
     try:
         tk = yf.Ticker(t)
-        df_yahoo = tk.history(period="1mo", interval="1d", auto_adjust=True)
+        # 1. 차트와 AI 예측을 위한 과거 2년치 충분한 데이터 수집
+        df_hist = tk.history(period="2y", interval="1d", auto_adjust=True)
+        
+        # 2. 가장 빠른 최신 가격 반영을 위한 단기 5일치 데이터 수집
         df_recent = tk.history(period="5d", interval="1d", auto_adjust=True)
         
-        df = df_recent if not df_recent.empty else df_yahoo
+        # 3. 과거 데이터에 최신 데이터를 병합하여 중복 제거 (최신값 우선 반영, 과거 데이터 보존)
+        if not df_hist.empty and not df_recent.empty:
+            df = pd.concat([df_hist, df_recent])
+            df = df[~df.index.duplicated(keep='last')]
+        elif not df_hist.empty:
+            df = df_hist
+        else:
+            df = df_recent
+            
         if df.empty:
             return pd.DataFrame()
             
@@ -644,7 +655,6 @@ with tab1:
 
         fig_chart = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.75, 0.25], vertical_spacing=0.03)
         
-        # 💡 전체 과거 데이터에 회색 점(markers)과 꺾임선(lines) 스타일 완벽 복원
         fig_chart.add_trace(go.Scatter(x=df_train["ds"], y=df_train["y"], mode="lines+markers", line=dict(color="#94A3B8", width=1), marker=dict(color="#94A3B8", size=3), name="실제 주가"), row=1, col=1)
         fig_chart.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], mode="lines", line=dict(color="#F43F5E", width=2), name="AI 예측선"), row=1, col=1)
         
