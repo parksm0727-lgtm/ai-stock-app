@@ -264,7 +264,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 """, unsafe_allow_html=True)
 
 # =========================================================
-# [4] 영구 저장소 (쿼리 파라미터 + 파일 이중 연동)
+# [4] 영구 저장소 (파일 중심 안정적 동기화)
 # =========================================================
 WATCHLIST_FILE = "watchlist.json"
 REPORT_FILE = "ai_reports.json"
@@ -292,24 +292,18 @@ def get_kst_now_str():
     kst = pytz.timezone('Asia/Seoul')
     return datetime.now(kst).strftime("%Y-%m-%d %H:%M")
 
+# 관심 종목 로딩 및 파일 동기화 강화
 if "watchlist" not in st.session_state:
-    query_wl = st.query_params.get("watchlist")
-    if query_wl:
-        if isinstance(query_wl, str):
-            st.session_state["watchlist"] = [item.strip() for item in query_wl.split(",") if item.strip()]
-        else:
-            st.session_state["watchlist"] = list(query_wl)
+    saved_wl = load_json_file(WATCHLIST_FILE, None)
+    if saved_wl and isinstance(saved_wl, list) and len(saved_wl) > 0:
+        st.session_state["watchlist"] = saved_wl
     else:
-        loaded_wl = load_json_file(WATCHLIST_FILE, DEFAULT_WATCHLIST.copy())
-        st.session_state["watchlist"] = loaded_wl
+        st.session_state["watchlist"] = DEFAULT_WATCHLIST.copy()
+        save_json_file(WATCHLIST_FILE, st.session_state["watchlist"])
 
 def update_watchlist_persistence(new_list):
     st.session_state["watchlist"] = new_list
     save_json_file(WATCHLIST_FILE, new_list)
-    try:
-        st.query_params["watchlist"] = ",".join(new_list)
-    except Exception:
-        pass
 
 if "current_ticker" not in st.session_state or st.session_state["current_ticker"] not in st.session_state["watchlist"]:
     st.session_state["current_ticker"] = st.session_state["watchlist"][0]
@@ -325,7 +319,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & 부드러운 예측 곡선 함수
+# [5] 데이터 로딩 & 안정화된 예측 함수 (왜곡 방지)
 # =========================================================
 @st.cache_data(ttl=60, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -362,11 +356,20 @@ def load_news(t: str) -> list:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
-    # 💡 불필요한 계절성 노이즈를 제거하여 매끄러운 트렌드 선 생성
-    m = Prophet(daily_seasonality=False, weekly_seasonality=False, yearly_seasonality=False)
+    # 💡 트렌드 민감도를 낮추고(changepoint_prior_scale=0.01) 선형 과장을 방지하여 완만한 곡선 생성
+    m = Prophet(daily_seasonality=False, weekly_seasonality=False, yearly_seasonality=False, changepoint_prior_scale=0.01)
     m.fit(df_train)
     future = m.make_future_dataframe(periods=years * 365)
     forecast = m.predict(future)
+    
+    # 예측선이 현재 주가의 2.5배를 넘지 않도록 안전 클리핑 적용 (그래프 폭등 방지)
+    max_recent_price = df_train["y"].iloc[-1]
+    forecast["yhat"] = forecast["yhat"].clip(lower=0, upper=max_recent_price * 2.5)
+    if "yhat_lower" in forecast.columns:
+        forecast["yhat_lower"] = forecast["yhat_lower"].clip(lower=0, upper=max_recent_price * 2.5)
+    if "yhat_upper" in forecast.columns:
+        forecast["yhat_upper"] = forecast["yhat_upper"].clip(lower=0, upper=max_recent_price * 2.5)
+        
     return forecast
 
 def get_valid_models(client: genai.Client) -> list:
