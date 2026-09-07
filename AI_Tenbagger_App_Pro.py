@@ -264,13 +264,13 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 """, unsafe_allow_html=True)
 
 # =========================================================
-# [4] 영구 저장소 (파일 중심 안정적 동기화)
+# [4] 영구 저장소
 # =========================================================
 WATCHLIST_FILE = "watchlist.json"
 REPORT_FILE = "ai_reports.json"
 RECOMMEND_FILE = "ai_recommends.json"
 CHART_ANALYSIS_FILE = "chart_analysis_cache.json"
-DEFAULT_WATCHLIST = ["ASTS", "OKLO", "IONQ", "RXRX", "PLTR", "TSLA"]
+DEFAULT_WATCHLIST = ["ASTS", "OKLO", "IONQ", "RXRX", "PLTR", "TSLA", "MRVL"]
 
 def load_json_file(filename, default_val):
     if os.path.exists(filename):
@@ -318,19 +318,15 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & 예측 함수 (과거 데이터 소실 오류 해결)
+# [5] 데이터 로딩 & 수학적 오류를 해결한 예측 함수
 # =========================================================
 @st.cache_data(ttl=60, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
     try:
         tk = yf.Ticker(t)
-        # 1. 차트와 AI 예측을 위한 과거 2년치 충분한 데이터 수집
         df_hist = tk.history(period="2y", interval="1d", auto_adjust=True)
-        
-        # 2. 가장 빠른 최신 가격 반영을 위한 단기 5일치 데이터 수집
         df_recent = tk.history(period="5d", interval="1d", auto_adjust=True)
         
-        # 3. 과거 데이터에 최신 데이터를 병합하여 중복 제거 (최신값 우선 반영, 과거 데이터 보존)
         if not df_hist.empty and not df_recent.empty:
             df = pd.concat([df_hist, df_recent])
             df = df[~df.index.duplicated(keep='last')]
@@ -366,9 +362,28 @@ def load_news(t: str) -> list:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
-    m = Prophet(daily_seasonality=False)
-    m.fit(df_train)
-    return m.predict(m.make_future_dataframe(periods=years * 365))
+    # 💡 [핵심 수정] 주가가 0 이하로 예측되는 것을 원천 차단하고 자연스러운 곡선을 위해 로그 변환 적용
+    df = df_train.copy()
+    # 0 이하의 비정상 값이 있을 경우 방지 처리 후 로그 변환
+    df["y"] = np.where(df["y"] <= 0, 0.01, df["y"]) 
+    df["y"] = np.log(df["y"])
+    
+    # 모델에 1년 주기(yearly_seasonality)를 활성화하여 직선이 아닌 파동 형태의 곡선 예측
+    m = Prophet(
+        daily_seasonality=False,
+        weekly_seasonality=False,
+        yearly_seasonality=True,
+        changepoint_prior_scale=0.05
+    )
+    m.fit(df)
+    
+    future = m.make_future_dataframe(periods=years * 365)
+    forecast = m.predict(future)
+    
+    # 💡 [핵심 수정] 예측을 마친 후 다시 지수 함수(exp)를 통해 원래 가격 스케일로 복원
+    forecast["yhat"] = np.exp(forecast["yhat"])
+    
+    return forecast
 
 def get_valid_models(client: genai.Client) -> list:
     valid_list = []
@@ -423,32 +438,6 @@ def get_active_gemini_key(sidebar_key: str) -> str:
     return sidebar_key or os.environ.get("GEMINI_API_KEY", "")
 
 def get_fallback_expert_analysis(t: str, delta_pct: float, rsi: float, mdd: float) -> tuple:
-    expert_profiles = {
-        "ASTS": (
-            f"• <b>펀더멘털 & 산업</b>\n"
-            f"- 저궤도(LEO) Direct-to-Cell 위성 통신망 구축 및 글로벌 MNO(AT&T, Verizon) 파트너십 상용화 기대감이 상방 모멘텀을 형성하고 있습니다.\n\n"
-            f"• <b>수급 & 퀀트</b>\n"
-            f"- 최근 단기 급등 후 수급 과열을 식히는 단계이며, RSI {rsi:.0f} 지표는 50일 이동평균선 부근에서 기술적 지지력을 소화 중입니다.",
-            f"• <b>시클리컬 전망</b>\n"
-            f"- 상업용 위성 발사 성공 및 주파수 승인 촉매 유효 시 장기 우상향 확장 가능성이 매우 높습니다.\n\n"
-            f"• <b>트레이딩 전략</b>\n"
-            f"- MDD {mdd:.1f}%의 변동성을 고려하여 1차 지지선 확인 후 리스크 관리 기반의 분할 매수 접근을 추천합니다."
-        ),
-        "OKLO": (
-            f"• <b>펀더멘털 & 산업</b>\n"
-            f"- AI 빅테크 데이터센터 전력 공급을 위한 차세대 소형모듈원자로(SMR) 테마 수혜주로 NRC 규제 승인 이슈가 핵심 변수입니다.\n\n"
-            f"• <b>수급 & 퀀트</b>\n"
-            f"- 성장주 수급 이동과 연계된 단기 조정으로, RSI {rsi:.0f} 지표는 기간 조정을 통한 기술적 매물대 다지기를 나타냅니다.",
-            f"• <b>시클리컬 전망</b>\n"
-            f"- 2030년 전력 공급 개시 전까지 인허가 뉴스 흐름에 따른 변동성 국면이 이어질 전망입니다.\n\n"
-            f"• <b>트레이딩 전략</b>\n"
-            f"- 하방 지지선 연동 확인 후 단기 매물대 돌파 여부에 맞춰 분할 진입하는 전략이 유효합니다."
-        )
-    }
-
-    if t in expert_profiles:
-        return expert_profiles[t][0], expert_profiles[t][1]
-    
     default_reason = (
         f"• <b>펀더멘털 & 산업</b>\n"
         f"- {t} 기업 고유의 비즈니스 모멘텀과 기술주 수급 흐름이 주가 변동에 직접 반영되는 국면입니다.\n\n"
@@ -457,7 +446,7 @@ def get_fallback_expert_analysis(t: str, delta_pct: float, rsi: float, mdd: floa
     )
     default_view = (
         f"• <b>시클리컬 전망</b>\n"
-        f"- Prophet 예측 궤적상 중장기 우상향 방향성은 유지되며 지수 환경의 영향을 지지받고 있습니다.\n\n"
+        f"- Prophet 예측 궤적상 중장기 방향성은 유지되며 지수 환경의 영향을 지지받고 있습니다.\n\n"
         f"• <b>트레이딩 전략</b>\n"
         f"- 주요 마디가 지지 여부를 확인 후 위험 대비 보상 비율을 고려한 분할 접근이 적합합니다."
     )
