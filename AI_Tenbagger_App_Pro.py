@@ -1,10 +1,11 @@
 import streamlit as st
 import yfinance as yf
-from prophet import Prophet
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 from google import genai
 from ta.momentum import RSIIndicator
+from ta.trend import MACD
+from ta.volatility import BollingerBands
 from datetime import date, datetime
 import pandas as pd
 import numpy as np
@@ -318,7 +319,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & 수학적 오류를 해결한 예측 함수
+# [5] 데이터 로딩 & 몬테카를로 시뮬레이션 엔진
 # =========================================================
 @st.cache_data(ttl=60, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -361,29 +362,35 @@ def load_news(t: str) -> list:
     except: return []
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
-    # 💡 [핵심 수정] 주가가 0 이하로 예측되는 것을 원천 차단하고 자연스러운 곡선을 위해 로그 변환 적용
-    df = df_train.copy()
-    # 0 이하의 비정상 값이 있을 경우 방지 처리 후 로그 변환
-    df["y"] = np.where(df["y"] <= 0, 0.01, df["y"]) 
-    df["y"] = np.log(df["y"])
+def run_monte_carlo_simulation(df_train: pd.DataFrame, years: int, num_simulations: int = 300) -> tuple:
+    """헤지펀드 스타일 몬테카를로 확률 분포 팬 차트 생성기 (기하 브라운 운동 기반)"""
+    prices = df_train["Close"].values
+    log_returns = np.log(prices[1:] / prices[:-1])
+    mu = np.mean(log_returns)
+    sigma = np.std(log_returns)
     
-    # 모델에 1년 주기(yearly_seasonality)를 활성화하여 직선이 아닌 파동 형태의 곡선 예측
-    m = Prophet(
-        daily_seasonality=False,
-        weekly_seasonality=False,
-        yearly_seasonality=True,
-        changepoint_prior_scale=0.05
-    )
-    m.fit(df)
+    num_days = years * 252
+    last_price = prices[-1]
+    last_date = df_train["Date"].iloc[-1]
     
-    future = m.make_future_dataframe(periods=years * 365)
-    forecast = m.predict(future)
+    future_dates = pd.bdate_range(start=last_date, periods=num_days + 1)[1:]
     
-    # 💡 [핵심 수정] 예측을 마친 후 다시 지수 함수(exp)를 통해 원래 가격 스케일로 복원
-    forecast["yhat"] = np.exp(forecast["yhat"])
+    dt = 1
+    shock = np.random.normal(0, 1, size=(num_days, num_simulations))
+    drift = (mu - 0.5 * sigma**2) * dt
+    diffusion = sigma * np.sqrt(dt) * shock
     
-    return forecast
+    paths = np.zeros((num_days, num_simulations))
+    paths[0] = last_price * np.exp(drift[0] + diffusion[0])
+    for t in range(1, num_days):
+        paths[t] = paths[t-1] * np.exp(drift + diffusion[t])
+        
+    # 하위 10%, 중앙값(50%), 상위 90% 확률 띠 계산
+    p10 = np.percentile(paths, 10, axis=1)
+    p50 = np.percentile(paths, 50, axis=1)
+    p90 = np.percentile(paths, 90, axis=1)
+    
+    return future_dates, p10, p50, p90
 
 def get_valid_models(client: genai.Client) -> list:
     valid_list = []
@@ -445,10 +452,10 @@ def get_fallback_expert_analysis(t: str, delta_pct: float, rsi: float, mdd: floa
         f"- 전일 대비 {delta_pct:+.2f}% 변동 속에 RSI {rsi:.0f} 수치는 기술적 수급 균형점을 탐색 중입니다."
     )
     default_view = (
-        f"• <b>시클리컬 전망</b>\n"
-        f"- Prophet 예측 궤적상 중장기 방향성은 유지되며 지수 환경의 영향을 지지받고 있습니다.\n\n"
+        f"• <b>확률 시클리컬 전망</b>\n"
+        f"- 몬테카를로 확률 분포상 중장기 띠 범위 내 변동성이 예상되며 분할 매크로 접근이 유효합니다.\n\n"
         f"• <b>트레이딩 전략</b>\n"
-        f"- 주요 마디가 지지 여부를 확인 후 위험 대비 보상 비율을 고려한 분할 접근이 적합합니다."
+        f"- 볼린저 밴드 및 핵심 지지선 연동 리스크 관리를 동반한 분할 매매가 적합합니다."
     )
     return default_reason, default_view
 
@@ -499,10 +506,10 @@ def get_chart_analysis_with_1hr_cache(t: str, cur_price: float, delta_pct: float
             f"• 펀더멘털 & 산업\n"
             f"- {t}의 핵심 기술 경쟁력, 사업 성장 이슈 및 가치 평가\n\n"
             f"• 수급 & 퀀트\n"
-            f"- 기술적 파동 및 RSI({rsi:.0f}), MDD({mdd:.1f}%) 수급 메커니즘\n\n"
+            f"- 볼린저 밴드, MACD 및 RSI({rsi:.0f}), MDD({mdd:.1f}%) 수급 메커니즘\n\n"
             f"[관점]\n"
             f"• 시클리컬 전망\n"
-            f"- Prophet AI 궤적 및 거시 구조 전망\n\n"
+            f"- 몬테카를로 확률 시뮬레이션 및 거시 구조 전망\n\n"
             f"• 트레이딩 전략\n"
             f"- 지지/저항 및 타깃/손절 매매 전략\n\n"
             f"각 항목별로 깔끔하게 들여쓰기(- )와 줄바꿈을 사용하여 보기 쉽게 작성하고, 반드시 '[원인]'과 '[관점]' 태그를 구분해 주세요."
@@ -595,7 +602,7 @@ with st.spinner("최신 주가 데이터 로딩 중..."):
 tab1, tab2, tab3, tab4 = st.tabs(["📈 차트", "🧠 리포트", "🌟 추천", "📝 일지"])
 
 # ========================================================
-# TAB 1: 차트 분석
+# TAB 1: 전문가용 퀀트 차트 분석 (볼린저밴드 + 몬테카를로 + MACD)
 # ========================================================
 with tab1:
     if data.empty or "Close" not in data.columns or data["Close"].dropna().empty:
@@ -623,10 +630,21 @@ with tab1:
             unsafe_allow_html=True,
         )
 
+        # 기술적 지표 계산 (RSI, Bollinger Bands, MACD)
         data["RSI"] = RSIIndicator(close=data["Close"], window=14).rsi()
         rsi_val = float(data["RSI"].dropna().iloc[-1]) if not data["RSI"].dropna().empty else 50.0
         rsi_state = "과매수" if rsi_val >= 70 else ("과매도" if rsi_val <= 30 else "중립")
         mdd_val = float((data['Close'] / data['Close'].cummax() - 1.0).min() * 100)
+
+        indicator_bb = BollingerBands(close=data["Close"], window=20, window_dev=2)
+        data["bb_high"] = indicator_bb.bollinger_hband()
+        data["bb_low"] = indicator_bb.bollinger_lband()
+        data["bb_mid"] = indicator_bb.bollinger_mavg()
+
+        indicator_macd = MACD(close=data["Close"])
+        data["macd"] = indicator_macd.macd()
+        data["macd_signal"] = indicator_macd.macd_signal()
+        data["macd_diff"] = indicator_macd.macd_diff()
 
         rsi_tag_color = "var(--up)" if rsi_state == "과매수" else ("var(--down)" if rsi_state == "과매도" else "var(--text-muted)")
 
@@ -636,22 +654,35 @@ with tab1:
             {"label": "52주 최고가", "value": f"${clean_close.tail(252).max():,.1f}"},
         ])
 
-        years = st.slider("미래 예측 기간 (년)", 1, 5, 2, label_visibility="collapsed")
-        df_train = data[["Date", "Close"]].dropna().copy().rename(columns={"Date": "ds", "Close": "y"})
+        years = st.slider("몬테카를로 확률 시뮬레이션 기간 (년)", 1, 5, 2, label_visibility="collapsed")
         
-        with st.spinner("예측 중..."):
-            forecast = run_forecast(df_train, years)
+        with st.spinner("확률 분포 시뮬레이션 계산 중..."):
+            mc_dates, p10, p50, p90 = run_monte_carlo_simulation(data, years)
 
+        # 전문가용 프로페셔널 서브플롯 구성 (Row 1: 주가 + 볼린저밴드 + 확률 범위 띠 / Row 2: MACD 히스토그램)
         fig_chart = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.75, 0.25], vertical_spacing=0.03)
         
-        fig_chart.add_trace(go.Scatter(x=df_train["ds"], y=df_train["y"], mode="lines+markers", line=dict(color="#94A3B8", width=1), marker=dict(color="#94A3B8", size=3), name="실제 주가"), row=1, col=1)
-        fig_chart.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], mode="lines", line=dict(color="#F43F5E", width=2), name="AI 예측선"), row=1, col=1)
+        # 실제 주가 선 & 점
+        fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["Close"], mode="lines+markers", line=dict(color="#94A3B8", width=1.5), marker=dict(color="#94A3B8", size=3), name="실제 주가"), row=1, col=1)
         
-        fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["RSI"], mode="lines", line=dict(color="#A78BFA", width=1)), row=2, col=1)
+        # 볼린저 밴드 상/하단
+        fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["bb_high"], mode="lines", line=dict(color="rgba(96, 165, 250, 0.3)", width=1), name="BB 상단"), row=1, col=1)
+        fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["bb_low"], mode="lines", line=dict(color="rgba(96, 165, 250, 0.3)", width=1), fill='tonexty', fillcolor="rgba(96, 165, 250, 0.05)", name="BB 하단"), row=1, col=1)
+
+        # 몬테카를로 확률 팬 차트 (상위 90% ~ 하위 10% 신뢰 구간 띠)
+        fig_chart.add_trace(go.Scatter(x=mc_dates, y=p90, mode="lines", line=dict(color="rgba(244, 63, 94, 0.2)", width=1), name="확률 상한 (90%)"), row=1, col=1)
+        fig_chart.add_trace(go.Scatter(x=mc_dates, y=p10, mode="lines", line=dict(color="rgba(244, 63, 94, 0.2)", width=1), fill='tonexty', fillcolor="rgba(244, 63, 94, 0.08)", name="확률 하한 (10%)"), row=1, col=1)
+        fig_chart.add_trace(go.Scatter(x=mc_dates, y=p50, mode="lines", line=dict(color="#F43F5E", width=2, dash="dash"), name="확률 중앙값 (P50)"), row=1, col=1)
+
+        # 하단 지표: MACD 히스토그램
+        colors = ['#F87171' if val >= 0 else '#60A5FA' for val in data["macd_diff"]]
+        fig_chart.add_trace(go.Bar(x=data["Date"], y=data["macd_diff"], marker_color=colors, name="MACD Diff"), row=2, col=1)
+        fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["macd"], mode="lines", line=dict(color="#F59E0B", width=1), name="MACD"), row=2, col=1)
+        fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["macd_signal"], mode="lines", line=dict(color="#A78BFA", width=1), name="Signal"), row=2, col=1)
 
         fig_chart.update_layout(
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=0, r=0, t=5, b=5), showlegend=False, height=240, 
+            margin=dict(l=0, r=0, t=5, b=5), showlegend=False, height=260, 
         )
         fig_chart.update_xaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4", size=9))
         fig_chart.update_yaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4", size=9))
@@ -661,7 +692,7 @@ with tab1:
 
         st.markdown("---")
         
-        st.markdown(f'<div class="section-title">📊 {ticker} 입체 주가 분석</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">📊 {ticker} 헤지펀드 퀀트 입체 분석</div>', unsafe_allow_html=True)
         force_run = st.button("🔄 AI 즉시 수동 재분석", type="primary", use_container_width=True)
 
         reason_msg, view_msg, created_at_str, was_updated = get_chart_analysis_with_1hr_cache(
@@ -677,22 +708,22 @@ with tab1:
 
         st.markdown(f"""
         <div class="analysis-card">
-            <div class="analysis-card-title">1. 현재 차트 및 핵심 지표</div>
+            <div class="analysis-card-title">1. 현재 차트 및 퀀트 지표</div>
             <div class="analysis-card-content">
-                <div class="sub-badge">지표 동향</div>
+                <div class="sub-badge">기술적 지표 동향</div>
                 <div class="sub-item">• <b>현재가</b>: ${current_price:,.2f} ({last_date_str} 기준, 전일 대비 {delta_pct:+.2f}% {trend_desc})</div>
-                <div class="sub-item">• <b>RSI 지표</b>: {rsi_val:.0f} ({rsi_state} 구간)</div>
-                <div class="sub-item">• <b>52주 최고가 대비 낙폭(MDD)</b>: {mdd_val:.1f}%</div>
+                <div class="sub-item">• <b>RSI / MDD</b>: RSI {rsi_val:.0f} ({rsi_state}), 최대낙폭(MDD) {mdd_val:.1f}%</div>
+                <div class="sub-item">• <b>변동성 밴드(Bollinger)</b>: 상단 및 하단 밴드 내 수급 수렴 구간 탐색 중</div>
             </div>
         </div>
 
         <div class="analysis-card">
-            <div class="analysis-card-title">2. 다차원 변동 원인 분석</div>
+            <div class="analysis-card-title">2. 다차원 수급 및 변동성 원인 분석</div>
             <div class="analysis-card-content">{reason_msg_html}</div>
         </div>
 
         <div class="analysis-card">
-            <div class="analysis-card-title">3. 향후 주가 예측 및 트레이딩 관점</div>
+            <div class="analysis-card-title">3. 몬테카를로 확률 시뮬레이션 및 트레이딩 관점</div>
             <div class="analysis-card-content">{view_msg_html}</div>
         </div>
         """, unsafe_allow_html=True)
