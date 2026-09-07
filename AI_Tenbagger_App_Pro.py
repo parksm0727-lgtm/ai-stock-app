@@ -644,8 +644,8 @@ with tab1:
 
         fig_chart = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.75, 0.25], vertical_spacing=0.03)
         
-        # 💡 실제 주가 데이터 회색 점(markers)과 예측선(lines)을 함께 복원
-        fig_chart.add_trace(go.Scatter(x=df_train["ds"], y=df_train["y"], mode="markers", marker=dict(color="#94A3B8", size=3), name="실제 주가"), row=1, col=1)
+        # 💡 전체 과거 데이터에 회색 점(markers)과 꺾임선(lines) 스타일 완벽 복원
+        fig_chart.add_trace(go.Scatter(x=df_train["ds"], y=df_train["y"], mode="lines+markers", line=dict(color="#94A3B8", width=1), marker=dict(color="#94A3B8", size=3), name="실제 주가"), row=1, col=1)
         fig_chart.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], mode="lines", line=dict(color="#F43F5E", width=2), name="AI 예측선"), row=1, col=1)
         
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["RSI"], mode="lines", line=dict(color="#A78BFA", width=1)), row=2, col=1)
