@@ -318,7 +318,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & 원본 형태의 부드러운 예측 함수 복원
+# [5] 데이터 로딩 & 예측 함수
 # =========================================================
 @st.cache_data(ttl=60, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -355,7 +355,6 @@ def load_news(t: str) -> list:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
-    # 💡 강제 상한 제한(clip)을 제거하여 원래의 자연스럽고 부드러운 Prophet 예측 곡선 복원
     m = Prophet(daily_seasonality=False)
     m.fit(df_train)
     return m.predict(m.make_future_dataframe(periods=years * 365))
@@ -644,8 +643,11 @@ with tab1:
             forecast = run_forecast(df_train, years)
 
         fig_chart = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.75, 0.25], vertical_spacing=0.03)
-        fig_chart.add_trace(go.Scatter(x=df_train["ds"], y=df_train["y"], mode="markers", marker=dict(color="#64748B", size=2)), row=1, col=1)
-        fig_chart.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], mode="lines", line=dict(color="#F43F5E", width=2)), row=1, col=1)
+        
+        # 💡 실제 주가 데이터 회색 점(markers)과 예측선(lines)을 함께 복원
+        fig_chart.add_trace(go.Scatter(x=df_train["ds"], y=df_train["y"], mode="markers", marker=dict(color="#94A3B8", size=3), name="실제 주가"), row=1, col=1)
+        fig_chart.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], mode="lines", line=dict(color="#F43F5E", width=2), name="AI 예측선"), row=1, col=1)
+        
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["RSI"], mode="lines", line=dict(color="#A78BFA", width=1)), row=2, col=1)
 
         fig_chart.update_layout(
