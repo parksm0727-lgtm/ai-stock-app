@@ -292,7 +292,6 @@ def get_kst_now_str():
     kst = pytz.timezone('Asia/Seoul')
     return datetime.now(kst).strftime("%Y-%m-%d %H:%M")
 
-# 관심 종목 복원 로직 (URL 파라미터 > 파일 > 기본값)
 if "watchlist" not in st.session_state:
     query_wl = st.query_params.get("watchlist")
     if query_wl:
@@ -326,7 +325,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & 예측 안정화 함수
+# [5] 데이터 로딩 & 부드러운 예측 곡선 함수
 # =========================================================
 @st.cache_data(ttl=60, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -363,19 +362,11 @@ def load_news(t: str) -> list:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def run_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
-    m = Prophet(daily_seasonality=False, weekly_seasonality=True, yearly_seasonality=True)
+    # 💡 불필요한 계절성 노이즈를 제거하여 매끄러운 트렌드 선 생성
+    m = Prophet(daily_seasonality=False, weekly_seasonality=False, yearly_seasonality=False)
     m.fit(df_train)
     future = m.make_future_dataframe(periods=years * 365)
     forecast = m.predict(future)
-    
-    # 예측값 왜곡 방지 클리핑 (최근 주가의 최대 4배를 넘지 않도록 상한 캡 설정하여 그래프 휨 현상 방지)
-    max_y = df_train["y"].max()
-    forecast["yhat"] = forecast["yhat"].clip(lower=0, upper=max_y * 4.0)
-    if "yhat_lower" in forecast.columns:
-        forecast["yhat_lower"] = forecast["yhat_lower"].clip(lower=0, upper=max_y * 4.0)
-    if "yhat_upper" in forecast.columns:
-        forecast["yhat_upper"] = forecast["yhat_upper"].clip(lower=0, upper=max_y * 4.0)
-        
     return forecast
 
 def get_valid_models(client: genai.Client) -> list:
