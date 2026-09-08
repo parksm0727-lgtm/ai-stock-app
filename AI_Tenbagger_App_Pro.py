@@ -82,7 +82,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
 .block-container {
     padding-top: 3.5rem !important;
-    padding-bottom: 5.5rem !important;
+    padding-bottom: calc(6.4rem + env(safe-area-inset-bottom, 0px)) !important;
     padding-left: 0.6rem !important;
     padding-right: 0.6rem !important;
     max-width: 720px !important;
@@ -217,31 +217,59 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 .mini-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1rem; color: var(--text); white-space: nowrap; }
 .mini-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; margin-top: 2px; font-weight: 600; }
 
+/* [UI 개선] 상단 탭을 모바일 앱처럼 화면 하단에 고정된 네비게이션 바로 변경.
+   기존에는 스크롤을 깊게 내린 뒤 다른 탭으로 이동하려면 맨 위까지 다시
+   스크롤해야 했는데, 하단 고정 바는 스크롤 위치와 무관하게 항상 엄지로
+   바로 탭 전환이 가능하다. st.tabs 자체는 클라이언트 사이드에서 전환되므로
+   (파이썬 재실행 없음) 위치만 옮겨도 기능은 그대로 유지된다. */
 .stTabs [data-baseweb="tab-list"] {
-    display: flex !important;
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    margin: 0 auto !important;
+    max-width: 720px !important;
     width: 100% !important;
+    display: flex !important;
     background-color: var(--surface) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 8px !important;
-    padding: 2px !important;
+    border: none !important;
+    border-top: 1px solid var(--border) !important;
+    border-radius: 16px 16px 0 0 !important;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px)) 4px !important;
     gap: 2px !important;
     box-sizing: border-box !important;
+    box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.35) !important;
+    z-index: 9999 !important;
 }
 
 .stTabs [data-baseweb="tab-list"] button {
     flex-grow: 1 !important;
     flex-shrink: 1 !important;
     flex-basis: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
     width: 100% !important;
     max-width: 100% !important;
     text-align: center !important;
     justify-content: center !important;
     align-items: center !important;
+    gap: 2px !important;
     color: var(--text-muted) !important;
-    border-radius: 6px !important;
+    border-radius: 10px !important;
     font-weight: 600 !important;
-    font-size: 0.85rem !important;
-    padding: 6px 0px !important;
+    font-size: 0.68rem !important;
+    line-height: 1.25 !important;
+    white-space: normal !important;
+    min-height: 46px !important;
+    padding: 6px 2px !important;
+    margin: 0 !important;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+/* Streamlit이 탭 라벨을 버튼 안쪽 <p> 태그로 렌더링하므로 폰트 크기를 함께 지정 */
+.stTabs [data-baseweb="tab-list"] button p {
+    font-size: 0.68rem !important;
+    line-height: 1.25 !important;
     margin: 0 !important;
 }
 
@@ -251,6 +279,11 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 }
 
 [data-baseweb="tab-highlight"] { display: none !important; }
+
+/* 탭 패널 내용이 하단 고정 바에 가려지지 않도록 여유 공간 확보 */
+.stTabs [data-baseweb="tab-panel"] {
+    padding-bottom: 0.5rem !important;
+}
 
 [data-baseweb="select"] > div { min-height: 2.2rem !important; background-color: var(--surface-2) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
 [data-testid="stExpander"] { background-color: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: var(--radius) !important; }
@@ -513,11 +546,12 @@ def run_model_backtest(df_train: pd.DataFrame, model_choice: str, holdout_days: 
     최근 holdout_days만큼을 "미래"인 척 떼어놓고, 그 이전 데이터로만 모델을
     학습시켜 holdout 구간을 예측한 뒤 실제 값과 비교한다.
 
-    주의(중요한 한계): 몬테카를로/하이브리드 트렌드의 백테스트는 모델이 쓰는
-    드리프트(mu) 하나로 그린 "중심 경로" 기준 오차이며, 확률분포 폭(P10~P90)이
-    실제로 그 구간을 잘 커버했는지까지 검증하는 것은 아니다. 즉 "이 모델의
-    방향성/평균 가정이 최근에 얼마나 맞았는지"를 보여주는 참고 지표이지,
-    확률 구간 자체의 신뢰도를 보장하지는 않는다.
+    주의(중요한 한계): 몬테카를로/하이브리드 트렌드의 백테스트는 각 모델이 실제로
+    화면에 그리는 "중심선" 하나의 공식만 검증하는 것이며(몬테카를로=기하 중앙값
+    P50, 하이브리드=산술평균 경로), 확률분포 폭(P10~P90)이 실제로 그 구간을 잘
+    커버했는지까지 검증하는 것은 아니다. 즉 "이 모델의 방향성/중심 가정이
+    최근에 얼마나 맞았는지"를 보여주는 참고 지표이지, 확률 구간 자체의
+    신뢰도를 보장하지는 않는다.
     """
     if df_train.empty or "Close" not in df_train.columns or len(df_train) < holdout_days + 100:
         return {"available": False}
@@ -538,7 +572,19 @@ def run_model_backtest(df_train: pd.DataFrame, model_choice: str, holdout_days: 
             future = pd.DataFrame({"ds": actual_part["Date"].values})
             fc = m.predict(future)
             pred_prices = np.exp(fc["yhat"].values)
+        elif model_choice.startswith("📊"):
+            # [수정] 화면에 그려지는 몬테카를로 P50(확률 중앙값) 라인은 여러 무작위
+            # 경로의 "중앙값"이며, 기하학적으로 last_price*exp((mu-0.5*sigma^2)*t)와
+            # 같다(변동성이 클수록 산술평균보다 낮아지는 "변동성 드래그" 반영).
+            # 이 -0.5*sigma^2 보정을 빼먹으면 실제로 화면에 표시되는 P50 라인이
+            # 아닌 다른 라인을 검증하게 되어, 하이브리드 트렌드와 오차가 우연히
+            # 같게 나오는 문제가 있었다.
+            mu, sigma = estimate_drift_vol(train_part)
+            t_steps = np.arange(1, n + 1)
+            pred_prices = last_train_price * np.exp((mu - 0.5 * sigma ** 2) * t_steps)
         else:
+            # 하이브리드 트렌드의 중앙 트렌드 라인은 변동성 드래그 보정이 없는
+            # 산술평균 경로 last_price*exp(mu*t) 이므로 그대로 검증한다.
             mu, _sigma = estimate_drift_vol(train_part)
             t_steps = np.arange(1, n + 1)
             pred_prices = last_train_price * np.exp(mu * t_steps)
@@ -898,7 +944,10 @@ with tab1:
             st.caption(
                 "μ는 2년 과거 평균수익률을 시장평균(연 8%) 쪽으로 30% 축소(shrinkage)한 값이고, "
                 "σ는 최근 데이터에 더 큰 가중치를 준 EWMA 추정치입니다. 몬테카를로·하이브리드 트렌드 "
-                "두 모델이 이 값을 공유합니다."
+                "두 모델이 이 μ·σ 값 자체는 공유하지만, 화면에 그려지는 중심선의 공식은 다릅니다 — "
+                "몬테카를로의 P50(중앙값)은 변동성이 클수록 낮아지는 보정이 들어간 기하 중앙값이고, "
+                "하이브리드 트렌드의 중앙 트렌드선은 그 보정이 없는 산술평균 경로라서, 변동성이 큰 "
+                "종목일수록 두 선의 위치가 벌어질 수 있습니다."
             )
 
             backtest = run_model_backtest(data, forecast_model, holdout_days=60)
