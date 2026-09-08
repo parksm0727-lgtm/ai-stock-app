@@ -82,7 +82,7 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 
 .block-container {
     padding-top: 3.5rem !important;
-    padding-bottom: calc(6.4rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(7.8rem + env(safe-area-inset-bottom, 0px)) !important;
     padding-left: 0.6rem !important;
     padding-right: 0.6rem !important;
     max-width: 720px !important;
@@ -228,20 +228,24 @@ div[data-testid="stTabs"] [role="tablist"] {
     position: fixed !important;
     left: 0 !important;
     right: 0 !important;
-    bottom: 0 !important;
+    /* [수정] bottom:0으로 두면 Streamlit Cloud가 앱 소유자에게만 보여주는
+       자체 "Manage app" 개발자 툴바와 겹쳐서 탭이 가려진다. 그 툴바는
+       플랫폼이 그리는 것이라 우리 CSS로 없앨 수 없으므로, 겹치지 않게
+       위로 띄운다. 그 툴바가 없는 환경(로컬 실행, 실제 방문자)에서는
+       하단에 약간의 여백이 남지만 어색하지 않은 수준이다. */
+    bottom: 3.4rem !important;
     margin: 0 auto !important;
     max-width: 720px !important;
     width: 100% !important;
     display: flex !important;
     background-color: var(--surface) !important;
-    border: none !important;
-    border-top: 1px solid var(--border) !important;
-    border-radius: 16px 16px 0 0 !important;
-    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px)) 4px !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 14px !important;
+    padding: 6px 4px !important;
     gap: 2px !important;
     box-sizing: border-box !important;
-    box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.35) !important;
-    z-index: 9999 !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45) !important;
+    z-index: 999999 !important;
 }
 
 .stTabs [data-baseweb="tab-list"] button,
