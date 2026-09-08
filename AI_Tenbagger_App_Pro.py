@@ -265,13 +265,15 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 """, unsafe_allow_html=True)
 
 # =========================================================
-# [4] 영구 저장소
+# [4] 영구 저장소 (초기화 방지)
 # =========================================================
 WATCHLIST_FILE = "watchlist.json"
 REPORT_FILE = "ai_reports.json"
 RECOMMEND_FILE = "ai_recommends.json"
 CHART_ANALYSIS_FILE = "chart_analysis_cache.json"
-DEFAULT_WATCHLIST = ["ASTS", "OKLO", "IONQ", "RXRX", "PLTR", "TSLA", "MRVL"]
+
+# 💡 기본 목록에 CBRS 등 주요 종목을 강제로 고정시켜 파일 리셋 시에도 복구되도록 처리
+DEFAULT_WATCHLIST = ["CBRS", "ASTS", "OKLO", "IONQ", "RXRX", "PLTR", "TSLA", "MRVL"]
 
 def load_json_file(filename, default_val):
     if os.path.exists(filename):
@@ -319,7 +321,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & 안전한 몬테카를로 시뮬레이션 엔진
+# [5] 데이터 로딩 & 극단값 제어 몬테카를로 엔진
 # =========================================================
 @st.cache_data(ttl=60, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -363,7 +365,7 @@ def load_news(t: str) -> list:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def run_monte_carlo_simulation(df_train: pd.DataFrame, years: int, num_simulations: int = 300) -> tuple:
-    """안전 장치가 포함된 몬테카를로 확률 분포 팬 차트 생성기"""
+    """안전 장치 및 극단적 발산 방지가 포함된 몬테카를로 모델"""
     if df_train.empty or "Close" not in df_train.columns or len(df_train) < 2:
         dummy_dates = pd.bdate_range(start=date.today(), periods=years * 252)
         return dummy_dates, np.ones(len(dummy_dates))*100, np.ones(len(dummy_dates))*100, np.ones(len(dummy_dates))*100
@@ -371,6 +373,11 @@ def run_monte_carlo_simulation(df_train: pd.DataFrame, years: int, num_simulatio
     prices = df_train["Close"].values
     log_returns = np.log(prices[1:] / prices[:-1])
     mu = np.mean(log_returns) if len(log_returns) > 0 else 0.0
+    
+    # 💡 [핵심 패치] CBRS처럼 짧은 기간의 급등락이 5년 복리로 적용되어 0원이나 우주로 날아가는 것을 방지
+    # 하루 평균 수익률(mu)의 한계를 두어 비현실적인 기하급수적 발산을 억제합니다.
+    mu = np.clip(mu, -0.0003, 0.0003) 
+    
     sigma = np.std(log_returns) if len(log_returns) > 0 and np.std(log_returns) > 0 else 0.02
     
     num_days = years * 252
@@ -621,7 +628,7 @@ with tab1:
         
         last_date_str = pd.to_datetime(data["Date"].iloc[-1]).strftime('%Y-%m-%d')
         price_status_label = f"{last_date_str} 마감 종가 기준"
-        price_reason_desc = f"복합 소스 및 단기 인터벌 비교를 통해 수신된 <b>{last_date_str}</b> 일자 확정 마감 종가입니다. 네이버 증권이나 구글 파이낸스의 해당일 종가와 비교하여 정확성을 직접 검증하실 수 있습니다."
+        price_reason_desc = f"복합 소스 및 단기 인터벌 비교를 통해 수신된 <b>{last_date_str}</b> 일자 확정 마감 종가입니다. 네이버 증권이나 구글 파이낸스의 해당일 종가와 비교하여 정확성을 직접 검증하실 수 시습니다."
 
         st.markdown(
             f'<div class="hero-price">'
