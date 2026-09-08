@@ -222,7 +222,9 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
    스크롤해야 했는데, 하단 고정 바는 스크롤 위치와 무관하게 항상 엄지로
    바로 탭 전환이 가능하다. st.tabs 자체는 클라이언트 사이드에서 전환되므로
    (파이썬 재실행 없음) 위치만 옮겨도 기능은 그대로 유지된다. */
-.stTabs [data-baseweb="tab-list"] {
+.stTabs [data-baseweb="tab-list"],
+.stTabs [role="tablist"],
+div[data-testid="stTabs"] [role="tablist"] {
     position: fixed !important;
     left: 0 !important;
     right: 0 !important;
@@ -242,7 +244,9 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
     z-index: 9999 !important;
 }
 
-.stTabs [data-baseweb="tab-list"] button {
+.stTabs [data-baseweb="tab-list"] button,
+.stTabs [role="tablist"] [role="tab"],
+div[data-testid="stTabs"] [role="tab"] {
     flex-grow: 1 !important;
     flex-shrink: 1 !important;
     flex-basis: 0 !important;
@@ -267,13 +271,15 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 }
 
 /* Streamlit이 탭 라벨을 버튼 안쪽 <p> 태그로 렌더링하므로 폰트 크기를 함께 지정 */
-.stTabs [data-baseweb="tab-list"] button p {
+.stTabs [data-baseweb="tab-list"] button p,
+.stTabs [role="tab"] p {
     font-size: 0.68rem !important;
     line-height: 1.25 !important;
     margin: 0 !important;
 }
 
-.stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+.stTabs [data-baseweb="tab-list"] button[aria-selected="true"],
+.stTabs [role="tab"][aria-selected="true"] {
     background-color: var(--surface-2) !important;
     color: #F59E0B !important;
 }
@@ -281,7 +287,8 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 [data-baseweb="tab-highlight"] { display: none !important; }
 
 /* 탭 패널 내용이 하단 고정 바에 가려지지 않도록 여유 공간 확보 */
-.stTabs [data-baseweb="tab-panel"] {
+.stTabs [data-baseweb="tab-panel"],
+.stTabs [role="tabpanel"] {
     padding-bottom: 0.5rem !important;
 }
 
