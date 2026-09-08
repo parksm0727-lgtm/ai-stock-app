@@ -273,7 +273,7 @@ REPORT_FILE = "ai_reports.json"
 RECOMMEND_FILE = "ai_recommends.json"
 CHART_ANALYSIS_FILE = "chart_analysis_cache.json"
 
-DEFAULT_WATCHLIST = ["CBRS", "ASTS", "OKLO", "IONQ", "RXRX", "PLTR", "TSLA", "MRVL"]
+DEFAULT_WATCHLIST = ["CBRS", "ASTS", "OKLO", "IONQ", "RXRX", "PLTR", "TSLA", "MRVL", "INTC"]
 
 def load_json_file(filename, default_val):
     if os.path.exists(filename):
@@ -321,7 +321,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & 예측 모델 엔진
+# [5] 데이터 로딩 & 안정화된 예측 모델 엔진
 # =========================================================
 @st.cache_data(ttl=60, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -363,7 +363,7 @@ def load_news(t: str) -> list:
     try: return yf.Ticker(t).news or []
     except: return []
 
-# 1. 몬테카를로 모델 (리스크 기반 확률 분석)
+# 1. 몬테카를로 모델
 @st.cache_data(ttl=3600, show_spinner=False)
 def run_monte_carlo_simulation(df_train: pd.DataFrame, years: int, num_simulations: int = 300) -> tuple:
     if df_train.empty or "Close" not in df_train.columns or len(df_train) < 2:
@@ -398,28 +398,20 @@ def run_monte_carlo_simulation(df_train: pd.DataFrame, years: int, num_simulatio
     
     return future_dates, p10, p50, p90
 
-# 2. Prophet AI 모델 (패턴 및 추세 기반 머신러닝 예측)
+# 2. 안정화된 Prophet AI 모델 (스케일 튐 현상 방지 패치)
 @st.cache_data(ttl=3600, show_spinner=False)
 def run_prophet_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
     df = df_train[["Date", "Close"]].copy().rename(columns={"Date": "ds", "Close": "y"})
-    # 주가가 0 이하로 떨어지는 것을 막는 수학적 로그 변환
-    df["y"] = np.where(df["y"] <= 0, 0.01, df["y"])
-    df["y"] = np.log(df["y"])
     
     m = Prophet(
         daily_seasonality=False,
         weekly_seasonality=False,
         yearly_seasonality=True,
-        changepoint_prior_scale=0.05
+        changepoint_prior_scale=0.03
     )
     m.fit(df)
     future = m.make_future_dataframe(periods=years * 365)
     forecast = m.predict(future)
-    
-    # 지수 변환으로 원래 가격 스케일 복구
-    forecast["yhat"] = np.exp(forecast["yhat"])
-    forecast["yhat_lower"] = np.exp(forecast["yhat_lower"])
-    forecast["yhat_upper"] = np.exp(forecast["yhat_upper"])
     
     return forecast
 
@@ -682,7 +674,6 @@ with tab1:
             {"label": "52주 최고가", "value": f"${clean_close.tail(252).max():,.1f}"},
         ])
 
-        # 💡 예측 모델 선택 UI 추가
         st.markdown("<br>", unsafe_allow_html=True)
         forecast_model = st.radio(
             "📊 **예측 분석 모델 선택**", 
@@ -697,7 +688,6 @@ with tab1:
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["bb_high"], mode="lines", line=dict(color="rgba(96, 165, 250, 0.3)", width=1), name="BB 상단"), row=1, col=1)
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["bb_low"], mode="lines", line=dict(color="rgba(96, 165, 250, 0.3)", width=1), fill='tonexty', fillcolor="rgba(96, 165, 250, 0.05)", name="BB 하단"), row=1, col=1)
 
-        # 💡 선택된 모델에 따라 그리기 분기
         if forecast_model == "📊 몬테카를로 (확률/리스크 분석)":
             with st.spinner("몬테카를로 확률 띠 시뮬레이션 중..."):
                 mc_dates, p10, p50, p90 = run_monte_carlo_simulation(data, years)
@@ -712,7 +702,6 @@ with tab1:
                 fig_chart.add_trace(go.Scatter(x=future_forecast['ds'], y=future_forecast['yhat_lower'], mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(245, 158, 11, 0.15)', name='AI 하한'), row=1, col=1)
                 fig_chart.add_trace(go.Scatter(x=future_forecast["ds"], y=future_forecast["yhat"], mode="lines", line=dict(color="#F59E0B", width=2), name="AI 예측 추세"), row=1, col=1)
 
-        # 하단 MACD
         colors = ['#F87171' if val >= 0 else '#60A5FA' for val in data["macd_diff"]]
         fig_chart.add_trace(go.Bar(x=data["Date"], y=data["macd_diff"], marker_color=colors, name="MACD Diff"), row=2, col=1)
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["macd"], mode="lines", line=dict(color="#F59E0B", width=1), name="MACD"), row=2, col=1)
