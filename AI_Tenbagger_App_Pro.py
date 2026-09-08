@@ -15,6 +15,8 @@ import uuid
 import json
 import time
 import pytz
+import re
+import html as html_lib
 
 # =========================================================
 # [1] 페이지 설정
@@ -329,7 +331,7 @@ def load_price_data(t: str) -> pd.DataFrame:
         tk = yf.Ticker(t)
         df_hist = tk.history(period="2y", interval="1d", auto_adjust=True)
         df_recent = tk.history(period="5d", interval="1d", auto_adjust=True)
-        
+
         if not df_hist.empty and not df_recent.empty:
             df = pd.concat([df_hist, df_recent])
             df = df[~df.index.duplicated(keep='last')]
@@ -337,10 +339,10 @@ def load_price_data(t: str) -> pd.DataFrame:
             df = df_hist
         else:
             df = df_recent
-            
+
         if df.empty:
             return pd.DataFrame()
-            
+
         df.reset_index(inplace=True)
         date_col = "Date" if "Date" in df.columns else ("Datetime" if "Datetime" in df.columns else df.columns[0])
         df.rename(columns={date_col: "Date"}, inplace=True)
@@ -352,61 +354,81 @@ def load_price_data(t: str) -> pd.DataFrame:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def is_valid_ticker(t: str) -> bool:
-    try: 
+    try:
         df = yf.Ticker(t).history(period="5d")
         return not df.empty and not df["Close"].isna().all()
-    except: 
+    except Exception:
         return False
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def load_news(t: str) -> list:
-    try: return yf.Ticker(t).news or []
-    except: return []
+    try:
+        return yf.Ticker(t).news or []
+    except Exception:
+        return []
 
 # 1. 몬테카를로 모델 (확률 분포 띠)
 @st.cache_data(ttl=3600, show_spinner=False)
-def run_monte_carlo_simulation(df_train: pd.DataFrame, years: int, num_simulations: int = 300) -> tuple:
+def run_monte_carlo_simulation(df_train: pd.DataFrame, years: int, num_simulations: int = 500) -> tuple:
     if df_train.empty or "Close" not in df_train.columns or len(df_train) < 2:
         dummy_dates = pd.bdate_range(start=date.today(), periods=years * 252)
         return dummy_dates, np.ones(len(dummy_dates))*100, np.ones(len(dummy_dates))*100, np.ones(len(dummy_dates))*100
 
     prices = df_train["Close"].values
     log_returns = np.log(prices[1:] / prices[:-1])
-    mu = np.mean(log_returns) if len(log_returns) > 0 else 0.0
-    mu = np.clip(mu, -0.0003, 0.0003) 
+    raw_mu = np.mean(log_returns) if len(log_returns) > 0 else 0.0
+
+    # [수정] 과거 원본 코드는 mu를 -0.0003~0.0003(연 약 -7%~+8%)로 강하게
+    # clip해버려서, 실제 성장주/급등주(예: 워치리스트의 IONQ, OKLO, ASTS 등)의
+    # 고유한 추세가 완전히 사라지고 사실상 모든 종목이 "거의 평평한" 예측으로
+    # 수렴하는 문제가 있었다.
+    # -> 장기 시장 평균 수익률(연 8% ≈ 일 0.0003) 쪽으로 30%만 축소(shrinkage)해
+    #    단기 과최적화는 줄이되, 종목 고유의 추세는 보존한다.
+    #    또한 clip 범위도 연 -60%~+130% 수준으로 현실적으로 넓혔다.
+    market_mu = 0.0003
+    mu = 0.7 * raw_mu + 0.3 * market_mu
+    mu = np.clip(mu, -0.0035, 0.0045)
     sigma = np.std(log_returns) if len(log_returns) > 0 and np.std(log_returns) > 0 else 0.02
-    
+
     num_days = years * 252
     last_price = prices[-1]
     last_date = df_train["Date"].iloc[-1]
-    
+
     future_dates = pd.bdate_range(start=last_date, periods=num_days + 1)[1:]
-    
+
     dt = 1
     shock = np.random.normal(0, 1, size=(num_days, num_simulations))
     drift = (mu - 0.5 * sigma**2) * dt
     diffusion = sigma * np.sqrt(dt) * shock
-    
+
     paths = np.zeros((num_days, num_simulations))
     paths[0] = last_price * np.exp(drift + diffusion[0])
     for t in range(1, num_days):
         paths[t] = paths[t-1] * np.exp(drift + diffusion[t])
-        
+
     p10 = np.percentile(paths, 10, axis=1)
     p50 = np.percentile(paths, 50, axis=1)
     p90 = np.percentile(paths, 90, axis=1)
-    
+
     p10 = np.clip(p10, 0.01, None)
     p50 = np.clip(p50, 0.01, None)
     p90 = np.clip(p90, 0.01, None)
-    
+
     return future_dates, p10, p50, p90
 
 # 2. Prophet AI 모델 (패턴 및 추세 예측 머신러닝)
 @st.cache_data(ttl=3600, show_spinner=False)
 def run_prophet_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
     df = df_train[["Date", "Close"]].copy().rename(columns={"Date": "ds", "Close": "y"})
-    
+
+    # [수정] 주가는 덧셈적이 아니라 곱셈적(로그정규) 성격이 강하다.
+    # 원본 코드처럼 원가격(y) 그대로 선형 추세로 학습하면, 몇 년을 외삽했을 때
+    # 상승 추세인 종목은 비현실적으로 폭주하고 하락 추세인 종목은 마이너스로
+    # 꺾여버려서 결국 0.01로 강제로 clip하는 임시방편이 필요했다.
+    # 로그 스케일로 학습하면 이 문제가 근본적으로 사라지고, 변동성도
+    # 퍼센트 기준으로 더 합리적으로 표현된다.
+    df["y"] = np.log(df["y"].clip(lower=0.01))
+
     m = Prophet(
         daily_seasonality=False,
         weekly_seasonality=False,
@@ -414,14 +436,18 @@ def run_prophet_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
         changepoint_prior_scale=0.04
     )
     m.fit(df)
-    future = m.make_future_dataframe(periods=years * 365)
+
+    # [수정] 주식은 주말/공휴일에 거래되지 않는데, 원본 코드는
+    # calendar day 기준(periods=years*365)으로 미래를 만들어 주말까지
+    # 예측 대상에 포함시키고 있었다. 영업일(freq="B") 기준으로 변경.
+    future = m.make_future_dataframe(periods=years * 252, freq="B")
     forecast = m.predict(future)
-    
-    # 마이너스 방지 방어선
-    forecast["yhat"] = np.clip(forecast["yhat"], 0.01, None)
-    forecast["yhat_lower"] = np.clip(forecast["yhat_lower"], 0.01, None)
-    forecast["yhat_upper"] = np.clip(forecast["yhat_upper"], 0.01, None)
-    
+
+    # 로그 스케일 -> 원래 가격 스케일로 역변환 (지수화하면 항상 양수이므로
+    # 별도의 방어적 clip이 사실상 불필요해지지만, 안전장치로 유지)
+    for col in ["yhat", "yhat_lower", "yhat_upper"]:
+        forecast[col] = np.clip(np.exp(forecast[col]), 0.01, None)
+
     return forecast
 
 # 3. 하이브리드 트렌드 모델
@@ -434,22 +460,31 @@ def run_advanced_ai_forecast(df_train: pd.DataFrame, years: int) -> tuple:
     prices = df_train["Close"].values
     last_price = prices[-1]
     last_date = df_train["Date"].iloc[-1]
-    
+
     num_days = years * 252
     future_dates = pd.bdate_range(start=last_date, periods=num_days + 1)[1:]
-    
+
     log_returns = np.log(prices[1:] / prices[:-1])
-    daily_drift = np.clip(np.mean(log_returns), -0.0001, 0.0001)
+    raw_drift = np.mean(log_returns) if len(log_returns) > 0 else 0.0
+
+    # [수정] 원본 코드는 daily_drift를 -0.0001~0.0001(연 약 -2.5%~+2.5%)로
+    # 극단적으로 좁게 clip해서, "하이브리드 트렌드"라는 이름과 달리 사실상
+    # 모든 종목이 거의 평평한 직선으로만 예측되는 문제가 있었다(몬테카를로와
+    # 동일한 GBM 수식을 쓰면서 오히려 추세를 더 강하게 눌러버린 셈).
+    # 몬테카를로와 동일한 shrinkage 로직으로 통일해 일관성을 맞췄다.
+    market_mu = 0.0003
+    daily_drift = 0.7 * raw_drift + 0.3 * market_mu
+    daily_drift = np.clip(daily_drift, -0.0035, 0.0045)
     volatility = np.std(log_returns) if np.std(log_returns) > 0 else 0.02
-    
+
     t_steps = np.arange(1, num_days + 1)
     central_path = last_price * np.exp(daily_drift * t_steps)
     band_width = volatility * np.sqrt(t_steps) * last_price * 0.7
-    
+
     upper_path = np.clip(central_path + band_width, 0.2, None)
     lower_path = np.clip(central_path - band_width, 0.05, None)
     central_path = np.clip(central_path, 0.1, None)
-    
+
     return future_dates, lower_path, central_path, upper_path
 
 def get_valid_models(client: genai.Client) -> list:
@@ -463,32 +498,37 @@ def get_valid_models(client: genai.Client) -> list:
                 valid_list.append(name)
     except Exception:
         pass
-    
+
     priority_keywords = ["3.7", "3.6", "3.0", "2.0", "flash"]
     sorted_models = []
     for kw in priority_keywords:
         for m_name in valid_list:
             if kw in m_name and m_name not in sorted_models:
                 sorted_models.append(m_name)
-    
+
     for m_name in valid_list:
         if m_name not in sorted_models:
             sorted_models.append(m_name)
-            
-    fallback_defaults = ["gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro"]
+
+    # [수정] gemini-2.0-flash / gemini-1.5-* 계열은 2026년 상반기에 이미
+    # 순차 종료(deprecate)되어 더 이상 존재하지 않는 모델이다. API가 폐기된
+    # 모델 이름을 반환하면 client.models.list() 실패 시 이 fallback으로
+    # 넘어가는데, 그 경우에도 죽은 모델만 시도하다 전부 실패하게 된다.
+    # 계속 서비스 중인 최신 모델들로 교체.
+    fallback_defaults = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.5-flash"]
     for fb in fallback_defaults:
         if fb not in sorted_models:
             sorted_models.append(fb)
-            
+
     return sorted_models
 
 def get_ai_text(api_key: str, preferred_model: str, prompt: str) -> str:
     client = genai.Client(api_key=api_key)
     candidate_models = get_valid_models(client)
-    
+
     if preferred_model and preferred_model != "auto" and preferred_model not in candidate_models:
         candidate_models.insert(0, preferred_model)
-        
+
     last_err = None
     for model_id in candidate_models:
         try:
@@ -498,7 +538,7 @@ def get_ai_text(api_key: str, preferred_model: str, prompt: str) -> str:
         except Exception as e:
             last_err = e
             continue
-            
+
     raise last_err or RuntimeError("사용 가능한 Gemini AI 모델을 찾지 못했습니다.")
 
 def get_active_gemini_key(sidebar_key: str) -> str:
@@ -522,33 +562,44 @@ def get_fallback_expert_analysis(t: str, delta_pct: float, rsi: float, mdd: floa
 def format_ai_content_to_html(text: str) -> str:
     if not text:
         return ""
-    
+
     lines = text.split("\n")
     formatted_lines = []
-    
+
     for line in lines:
         line_str = line.strip()
         if not line_str:
             formatted_lines.append("<br>")
             continue
-            
-        line_str = line_str.replace("**", "<b>").replace("**", "</b>")
-        
-        if line_str.startswith("•") or line_str.startswith("*") or line_str.startswith("1.") or line_str.startswith("2.") or line_str.startswith("3.") or line_str.startswith("4.") or line_str.startswith("5."):
-            title_text = line_str.lstrip("•*12345. ").strip()
+
+        # [보안 수정] AI가 생성한 원문(뉴스 제목 등 외부 입력이 프롬프트에
+        # 섞여 들어감)을 그대로 unsafe_allow_html=True로 렌더링하면, 만약
+        # 응답에 <script> 등이 섞여 들어올 경우 그대로 실행되는 프롬프트
+        # 인젝션/XSS 위험이 있다. 먼저 HTML 이스케이프한 뒤, 우리가 직접
+        # 만든 서식(볼드, 배지 등)만 안전하게 다시 태그로 바꿔준다.
+        safe_line = html_lib.escape(line_str)
+
+        # [버그 수정] 원본 코드는 "**"를 순서대로 <b>, </b>로 바꿨는데,
+        # str.replace는 매 호출마다 "모든" occurrence를 바꾸므로
+        # "**굵게**" 같은 줄은 <b>와 </b>가 아니라 <b>...<b> 형태로 깨졌다.
+        # 정규식으로 쌍을 맞춰 치환하도록 수정.
+        safe_line = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", safe_line)
+
+        if safe_line.startswith("•") or safe_line.startswith("*") or safe_line[:2] in ("1.", "2.", "3.", "4.", "5."):
+            title_text = safe_line.lstrip("•*12345. ").strip()
             formatted_lines.append(f'<div class="sub-badge">{title_text}</div>')
-        elif line_str.startswith("-"):
-            item_text = line_str.lstrip("- ").strip()
+        elif safe_line.startswith("-"):
+            item_text = safe_line.lstrip("- ").strip()
             formatted_lines.append(f'<div class="sub-item">• {item_text}</div>')
         else:
-            formatted_lines.append(f'<div>{line_str}</div>')
-            
+            formatted_lines.append(f'<div>{safe_line}</div>')
+
     return "".join(formatted_lines)
 
 def get_chart_analysis_with_1hr_cache(t: str, cur_price: float, delta_pct: float, rsi: float, mdd: float, api_key: str, model_n: str, force_refresh: bool = False) -> tuple:
     cache = st.session_state["chart_analysis_cache"]
     now_ts = time.time()
-    
+
     if not force_refresh and t in cache:
         item = cache[t]
         last_ts = item.get("timestamp", 0)
@@ -627,9 +678,9 @@ st.markdown("""
 selected_index = st.session_state["watchlist"].index(st.session_state["current_ticker"]) if st.session_state["current_ticker"] in st.session_state["watchlist"] else 0
 
 ticker = st.selectbox(
-    "🔍 분석 대상 종목", 
-    st.session_state["watchlist"], 
-    index=selected_index, 
+    "🔍 분석 대상 종목",
+    st.session_state["watchlist"],
+    index=selected_index,
     key="ticker_select_box",
     on_change=on_ticker_change,
     label_visibility="collapsed"
@@ -652,7 +703,7 @@ with st.expander("➕ 종목 관리"):
         if del_ticker in current_wl:
             current_wl.remove(del_ticker)
             update_watchlist_persistence(current_wl)
-            if st.session_state["current_ticker"] == del_ticker: 
+            if st.session_state["current_ticker"] == del_ticker:
                 st.session_state["current_ticker"] = current_wl[0]
             st.rerun()
 
@@ -673,9 +724,9 @@ with tab1:
         prev_close = float(clean_close.iloc[-2]) if len(clean_close) > 1 else current_price
         delta = current_price - prev_close
         delta_pct = (delta / prev_close * 100) if prev_close else 0.0
-        
+
         delta_color = "var(--up)" if delta >= 0 else "var(--down)"
-        
+
         last_date_str = pd.to_datetime(data["Date"].iloc[-1]).strftime('%Y-%m-%d')
         price_status_label = f"{last_date_str} 마감 종가 기준"
 
@@ -712,11 +763,10 @@ with tab1:
         ])
 
         st.markdown("<br>", unsafe_allow_html=True)
-        # 💡 3가지 모델 선택 라디오 버튼 복원
         forecast_model = st.radio(
-            "📊 **예측 분석 모델 선택**", 
+            "📊 **예측 분석 모델 선택**",
             [
-                "📊 몬테카를로 (확률/리스크 분석)", 
+                "📊 몬테카를로 (확률/리스크 분석)",
                 "🤖 Prophet AI (추세/패턴 예측)",
                 "🌟 하이브리드 트렌드 (안정형 밴드)"
             ],
@@ -724,13 +774,12 @@ with tab1:
         )
 
         years = st.slider("예측 기간 (년)", 1, 5, 2, label_visibility="collapsed")
-        
+
         fig_chart = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.75, 0.25], vertical_spacing=0.03)
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["Close"], mode="lines+markers", line=dict(color="#94A3B8", width=1.5), marker=dict(color="#94A3B8", size=3), name="실제 주가"), row=1, col=1)
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["bb_high"], mode="lines", line=dict(color="rgba(96, 165, 250, 0.3)", width=1), name="BB 상단"), row=1, col=1)
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["bb_low"], mode="lines", line=dict(color="rgba(96, 165, 250, 0.3)", width=1), fill='tonexty', fillcolor="rgba(96, 165, 250, 0.05)", name="BB 하단"), row=1, col=1)
 
-        # 💡 선택된 모델에 따른 시각화 분기
         if forecast_model == "📊 몬테카를로 (확률/리스크 분석)":
             with st.spinner("몬테카를로 확률 띠 시뮬레이션 중..."):
                 mc_dates, p10, p50, p90 = run_monte_carlo_simulation(data, years)
@@ -758,7 +807,7 @@ with tab1:
 
         fig_chart.update_layout(
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=0, r=0, t=5, b=5), showlegend=False, height=260, 
+            margin=dict(l=0, r=0, t=5, b=5), showlegend=False, height=260,
         )
         fig_chart.update_xaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4", size=9))
         fig_chart.update_yaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4", size=9))
@@ -767,7 +816,7 @@ with tab1:
         active_key = get_active_gemini_key(api_key_input)
 
         st.markdown("---")
-        
+
         st.markdown(f'<div class="section-title">📊 {ticker} 헤지펀드 퀀트 입체 분석</div>', unsafe_allow_html=True)
         force_run = st.button("🔄 AI 즉시 수동 재분석", type="primary", use_container_width=True)
 
@@ -779,7 +828,7 @@ with tab1:
         view_msg_html = format_ai_content_to_html(view_msg)
 
         trend_desc = "상승 강세" if delta >= 0 else "하락 조정"
-        
+
         st.caption(f"📅 **마지막 분석 완료 (KST):** `{created_at_str}` (자동 재분석 주기: 1시간)")
 
         st.markdown(f"""
@@ -810,7 +859,7 @@ with tab1:
 with tab2:
     st.markdown(f'<div class="section-title">🧠 {ticker} 전문가 딥다이브 심층 분석</div>', unsafe_allow_html=True)
     st.markdown('<div class="price-reason-box">🎯 월가 수석 애널리스트 및 펀드매니저 관점에서 경영진, 경쟁 해자, 재무 구조, 매크로 리스크 및 텐배거 촉매를 정밀 진단합니다.</div>', unsafe_allow_html=True)
-    
+
     active_key = get_active_gemini_key(api_key_input)
     if st.button("🔥 전문가 심층 분석 리포트 생성", use_container_width=True, type="primary"):
         if not active_key:
@@ -820,7 +869,7 @@ with tab2:
                 recent_news = load_news(ticker)[:10]
                 news_items = [f"- {item.get('content', {}).get('title') or item.get('title', '제목 없음')}" for item in recent_news]
                 news_text = "\n".join(news_items) if news_items else "최신 뉴스가 없습니다."
-                
+
                 expert_prompt = (
                     f"당신은 글로벌 탑티어 헤지펀드의 수석 테크/성장주 애널리스트입니다. {date.today().year}년 현재 시점 미주 종목 '{ticker}'에 대해 최고 수준의 전문가적 심층 딥다이브 리포트를 작성해주세요.\n\n"
                     f"최신 뉴스 참고:\n{news_text}\n\n"
@@ -832,7 +881,7 @@ with tab2:
                     f"5. 10배 성장(텐배거) 핵심 촉매 및 마일스톤\n\n"
                     f"각 항목별로 번호나 기호를 붙이고, 구체적이고 전문적인 어휘를 사용하여 상세하고 깊이 있게 작성해주세요."
                 )
-                try: 
+                try:
                     res_text = get_ai_text(active_key, model_name, expert_prompt)
                     now_kst_str = get_kst_now_str()
                     st.session_state["ai_report_cache"][ticker] = {
@@ -841,13 +890,13 @@ with tab2:
                     }
                     save_json_file(REPORT_FILE, st.session_state["ai_report_cache"])
                     st.rerun()
-                except Exception as e: 
+                except Exception as e:
                     st.error(f"분석 중 오류 발생: {e}")
 
     if ticker in st.session_state["ai_report_cache"]:
         item = st.session_state["ai_report_cache"][ticker]
         st.caption(f"📅 **전문가 딥다이브 분석 완료 일시 (KST):** `{item['created_at']}`")
-        
+
         formatted_report = format_ai_content_to_html(item["content"])
         st.markdown(f"""
         <div class="analysis-card">
@@ -862,20 +911,20 @@ with tab2:
 with tab3:
     sector_options = [
         "🤖 AI 자율 분야 발굴 (최신 글로벌 뉴스 기반)",
-        "우주 항공 및 통신", 
-        "AI 바이오 헬스케어", 
-        "차세대 에너지 (SMR)", 
+        "우주 항공 및 통신",
+        "AI 바이오 헬스케어",
+        "차세대 에너지 (SMR)",
         "양자 컴퓨팅"
     ]
     sector_choice = st.selectbox("분야 선택", sector_options)
-    
+
     if st.button("✨ 텐배거 종목 추천받기", use_container_width=True, type="primary"):
         active_key = get_active_gemini_key(api_key_input)
-        if not active_key: 
+        if not active_key:
             st.error("API 키를 입력해 주세요.")
         else:
             with st.spinner("전세계 최신 뉴스 및 산업 동향 실시간 종합 분석 중..."):
-                try: 
+                try:
                     if sector_choice == "🤖 AI 자율 분야 발굴 (최신 글로벌 뉴스 기반)":
                         prompt = (
                             f"현재 {date.today().year}년 최신 글로벌 뉴스, 주요 기술 트렌드 및 주식 시장 동향을 종합적으로 판단하세요.\n"
@@ -884,7 +933,7 @@ with tab3:
                         )
                     else:
                         prompt = f"현재 시점 {date.today().year}년. '{sector_choice}' 분야 10배 성장 유망 중소형주 3개 요약."
-                        
+
                     res_text = get_ai_text(active_key, model_name, prompt)
                     now_kst_str = get_kst_now_str()
                     st.session_state["ai_recommend_cache"][sector_choice] = {
@@ -893,7 +942,7 @@ with tab3:
                     }
                     save_json_file(RECOMMEND_FILE, st.session_state["ai_recommend_cache"])
                     st.rerun()
-                except Exception as e: 
+                except Exception as e:
                     st.error(f"오류 발생: {e}")
 
     if sector_choice in st.session_state["ai_recommend_cache"]:
@@ -908,7 +957,7 @@ with tab4:
     def load_journal():
         if os.path.exists(JOURNAL_FILE):
             df = pd.read_csv(JOURNAL_FILE)
-            if "ID" not in df.columns: 
+            if "ID" not in df.columns:
                 df.insert(0, "ID", [uuid.uuid4().hex[:8] for _ in range(len(df))])
             df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
             return df
@@ -933,18 +982,18 @@ with tab4:
     df_journal = load_journal()
     if not df_journal.empty:
         st.caption("💡 수정 및 삭제는 화면에서 행을 편집/삭제하는 즉시 자동 저장됩니다.")
-        
+
         edited_df = st.data_editor(
-            df_journal[df_journal["Ticker"] == ticker], 
-            num_rows="dynamic", 
-            hide_index=True, 
+            df_journal[df_journal["Ticker"] == ticker],
+            num_rows="dynamic",
+            hide_index=True,
             key="j_editor",
             column_config={"ID": st.column_config.TextColumn(disabled=True)}
         )
-        
+
         other_rows = df_journal[df_journal["Ticker"] != ticker]
         current_combined = pd.concat([other_rows, edited_df], ignore_index=True)
-        
+
         if not current_combined.equals(df_journal):
             save_journal(current_combined)
             st.rerun()
