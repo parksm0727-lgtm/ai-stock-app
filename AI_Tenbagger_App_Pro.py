@@ -1,5 +1,6 @@
 import streamlit as st
 import yfinance as yf
+from prophet import Prophet
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 from google import genai
@@ -265,14 +266,13 @@ h2, h3, h4, h5, h6, p, label, span, div { color: var(--text); }
 """, unsafe_allow_html=True)
 
 # =========================================================
-# [4] 영구 저장소 (초기화 방지)
+# [4] 영구 저장소
 # =========================================================
 WATCHLIST_FILE = "watchlist.json"
 REPORT_FILE = "ai_reports.json"
 RECOMMEND_FILE = "ai_recommends.json"
 CHART_ANALYSIS_FILE = "chart_analysis_cache.json"
 
-# 💡 기본 목록에 CBRS 등 주요 종목을 강제로 고정시켜 파일 리셋 시에도 복구되도록 처리
 DEFAULT_WATCHLIST = ["CBRS", "ASTS", "OKLO", "IONQ", "RXRX", "PLTR", "TSLA", "MRVL"]
 
 def load_json_file(filename, default_val):
@@ -321,7 +321,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & 극단값 제어 몬테카를로 엔진
+# [5] 데이터 로딩 & 예측 모델 엔진
 # =========================================================
 @st.cache_data(ttl=60, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -363,9 +363,9 @@ def load_news(t: str) -> list:
     try: return yf.Ticker(t).news or []
     except: return []
 
+# 1. 몬테카를로 모델 (리스크 기반 확률 분석)
 @st.cache_data(ttl=3600, show_spinner=False)
 def run_monte_carlo_simulation(df_train: pd.DataFrame, years: int, num_simulations: int = 300) -> tuple:
-    """안전 장치 및 극단적 발산 방지가 포함된 몬테카를로 모델"""
     if df_train.empty or "Close" not in df_train.columns or len(df_train) < 2:
         dummy_dates = pd.bdate_range(start=date.today(), periods=years * 252)
         return dummy_dates, np.ones(len(dummy_dates))*100, np.ones(len(dummy_dates))*100, np.ones(len(dummy_dates))*100
@@ -373,11 +373,7 @@ def run_monte_carlo_simulation(df_train: pd.DataFrame, years: int, num_simulatio
     prices = df_train["Close"].values
     log_returns = np.log(prices[1:] / prices[:-1])
     mu = np.mean(log_returns) if len(log_returns) > 0 else 0.0
-    
-    # 💡 [핵심 패치] CBRS처럼 짧은 기간의 급등락이 5년 복리로 적용되어 0원이나 우주로 날아가는 것을 방지
-    # 하루 평균 수익률(mu)의 한계를 두어 비현실적인 기하급수적 발산을 억제합니다.
     mu = np.clip(mu, -0.0003, 0.0003) 
-    
     sigma = np.std(log_returns) if len(log_returns) > 0 and np.std(log_returns) > 0 else 0.02
     
     num_days = years * 252
@@ -401,6 +397,31 @@ def run_monte_carlo_simulation(df_train: pd.DataFrame, years: int, num_simulatio
     p90 = np.percentile(paths, 90, axis=1)
     
     return future_dates, p10, p50, p90
+
+# 2. Prophet AI 모델 (패턴 및 추세 기반 머신러닝 예측)
+@st.cache_data(ttl=3600, show_spinner=False)
+def run_prophet_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
+    df = df_train[["Date", "Close"]].copy().rename(columns={"Date": "ds", "Close": "y"})
+    # 주가가 0 이하로 떨어지는 것을 막는 수학적 로그 변환
+    df["y"] = np.where(df["y"] <= 0, 0.01, df["y"])
+    df["y"] = np.log(df["y"])
+    
+    m = Prophet(
+        daily_seasonality=False,
+        weekly_seasonality=False,
+        yearly_seasonality=True,
+        changepoint_prior_scale=0.05
+    )
+    m.fit(df)
+    future = m.make_future_dataframe(periods=years * 365)
+    forecast = m.predict(future)
+    
+    # 지수 변환으로 원래 가격 스케일 복구
+    forecast["yhat"] = np.exp(forecast["yhat"])
+    forecast["yhat_lower"] = np.exp(forecast["yhat_lower"])
+    forecast["yhat_upper"] = np.exp(forecast["yhat_upper"])
+    
+    return forecast
 
 def get_valid_models(client: genai.Client) -> list:
     valid_list = []
@@ -463,9 +484,9 @@ def get_fallback_expert_analysis(t: str, delta_pct: float, rsi: float, mdd: floa
     )
     default_view = (
         f"• <b>확률 시클리컬 전망</b>\n"
-        f"- 몬테카를로 확률 분포상 중장기 띠 범위 내 변동성이 예상되며 분할 매크로 접근이 유효합니다.\n\n"
+        f"- 분석 모델에 기반하여 향후 중장기 변동성이 예상되며 분할 매크로 접근이 유효합니다.\n\n"
         f"• <b>트레이딩 전략</b>\n"
-        f"- 볼린저 밴드 및 핵심 지지선 연동 리스크 관리를 동반한 분할 매매가 적합합니다."
+        f"- 기술적 밴드 및 핵심 지지선 연동 리스크 관리를 동반한 분할 매매가 적합합니다."
     )
     return default_reason, default_view
 
@@ -519,7 +540,7 @@ def get_chart_analysis_with_1hr_cache(t: str, cur_price: float, delta_pct: float
             f"- 볼린저 밴드, MACD 및 RSI({rsi:.0f}), MDD({mdd:.1f}%) 수급 메커니즘\n\n"
             f"[관점]\n"
             f"• 시클리컬 전망\n"
-            f"- 몬테카를로 확률 시뮬레이션 및 거시 구조 전망\n\n"
+            f"- AI/퀀트 예측 모델 결과에 기반한 거시 구조 전망\n\n"
             f"• 트레이딩 전략\n"
             f"- 지지/저항 및 타깃/손절 매매 전략\n\n"
             f"각 항목별로 깔끔하게 들여쓰기(- )와 줄바꿈을 사용하여 보기 쉽게 작성하고, 반드시 '[원인]'과 '[관점]' 태그를 구분해 주세요."
@@ -628,15 +649,13 @@ with tab1:
         
         last_date_str = pd.to_datetime(data["Date"].iloc[-1]).strftime('%Y-%m-%d')
         price_status_label = f"{last_date_str} 마감 종가 기준"
-        price_reason_desc = f"복합 소스 및 단기 인터벌 비교를 통해 수신된 <b>{last_date_str}</b> 일자 확정 마감 종가입니다. 네이버 증권이나 구글 파이낸스의 해당일 종가와 비교하여 정확성을 직접 검증하실 수 시습니다."
 
         st.markdown(
             f'<div class="hero-price">'
             f'<div class="hero-label">{ticker} 가격 <span style="font-size:0.65rem; color:#F59E0B; background:#271E10; padding:1px 5px; border-radius:4px; margin-left:4px; border:1px solid #78350F;">{price_status_label}</span></div>'
             f'<div class="hero-value">${current_price:,.2f}</div>'
             f'<div class="hero-delta" style="color:{delta_color};">{"▲" if delta >= 0 else "▼"} {abs(delta):,.2f} ({abs(delta_pct):.2f}%)</div>'
-            f'</div>'
-            f'<div class="price-reason-box">🔍 <b>데이터 검증 안내:</b> {price_reason_desc}</div>',
+            f'</div>',
             unsafe_allow_html=True,
         )
 
@@ -663,22 +682,37 @@ with tab1:
             {"label": "52주 최고가", "value": f"${clean_close.tail(252).max():,.1f}"},
         ])
 
-        years = st.slider("몬테카를로 확률 시뮬레이션 기간 (년)", 1, 5, 2, label_visibility="collapsed")
-        
-        with st.spinner("확률 분포 시뮬레이션 계산 중..."):
-            mc_dates, p10, p50, p90 = run_monte_carlo_simulation(data, years)
+        # 💡 예측 모델 선택 UI 추가
+        st.markdown("<br>", unsafe_allow_html=True)
+        forecast_model = st.radio(
+            "📊 **예측 분석 모델 선택**", 
+            ["📊 몬테카를로 (확률/리스크 분석)", "🤖 Prophet AI (추세/패턴 예측)"],
+            horizontal=True
+        )
 
+        years = st.slider("예측 기간 (년)", 1, 5, 2, label_visibility="collapsed")
+        
         fig_chart = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.75, 0.25], vertical_spacing=0.03)
-        
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["Close"], mode="lines+markers", line=dict(color="#94A3B8", width=1.5), marker=dict(color="#94A3B8", size=3), name="실제 주가"), row=1, col=1)
-        
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["bb_high"], mode="lines", line=dict(color="rgba(96, 165, 250, 0.3)", width=1), name="BB 상단"), row=1, col=1)
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["bb_low"], mode="lines", line=dict(color="rgba(96, 165, 250, 0.3)", width=1), fill='tonexty', fillcolor="rgba(96, 165, 250, 0.05)", name="BB 하단"), row=1, col=1)
 
-        fig_chart.add_trace(go.Scatter(x=mc_dates, y=p90, mode="lines", line=dict(color="rgba(244, 63, 94, 0.2)", width=1), name="확률 상한 (90%)"), row=1, col=1)
-        fig_chart.add_trace(go.Scatter(x=mc_dates, y=p10, mode="lines", line=dict(color="rgba(244, 63, 94, 0.2)", width=1), fill='tonexty', fillcolor="rgba(244, 63, 94, 0.08)", name="확률 하한 (10%)"), row=1, col=1)
-        fig_chart.add_trace(go.Scatter(x=mc_dates, y=p50, mode="lines", line=dict(color="#F43F5E", width=2, dash="dash"), name="확률 중앙값 (P50)"), row=1, col=1)
+        # 💡 선택된 모델에 따라 그리기 분기
+        if forecast_model == "📊 몬테카를로 (확률/리스크 분석)":
+            with st.spinner("몬테카를로 확률 띠 시뮬레이션 중..."):
+                mc_dates, p10, p50, p90 = run_monte_carlo_simulation(data, years)
+                fig_chart.add_trace(go.Scatter(x=mc_dates, y=p90, mode="lines", line=dict(color="rgba(244, 63, 94, 0.2)", width=1), name="확률 상한 (90%)"), row=1, col=1)
+                fig_chart.add_trace(go.Scatter(x=mc_dates, y=p10, mode="lines", line=dict(color="rgba(244, 63, 94, 0.2)", width=1), fill='tonexty', fillcolor="rgba(244, 63, 94, 0.08)", name="확률 하한 (10%)"), row=1, col=1)
+                fig_chart.add_trace(go.Scatter(x=mc_dates, y=p50, mode="lines", line=dict(color="#F43F5E", width=2, dash="dash"), name="확률 중앙값 (P50)"), row=1, col=1)
+        else:
+            with st.spinner("Prophet 머신러닝 시계열 예측 중..."):
+                forecast = run_prophet_forecast(data, years)
+                future_forecast = forecast[forecast['ds'] > data['Date'].iloc[-1]]
+                fig_chart.add_trace(go.Scatter(x=future_forecast['ds'], y=future_forecast['yhat_upper'], mode='lines', line=dict(width=0), name='AI 상한'), row=1, col=1)
+                fig_chart.add_trace(go.Scatter(x=future_forecast['ds'], y=future_forecast['yhat_lower'], mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(245, 158, 11, 0.15)', name='AI 하한'), row=1, col=1)
+                fig_chart.add_trace(go.Scatter(x=future_forecast["ds"], y=future_forecast["yhat"], mode="lines", line=dict(color="#F59E0B", width=2), name="AI 예측 추세"), row=1, col=1)
 
+        # 하단 MACD
         colors = ['#F87171' if val >= 0 else '#60A5FA' for val in data["macd_diff"]]
         fig_chart.add_trace(go.Bar(x=data["Date"], y=data["macd_diff"], marker_color=colors, name="MACD Diff"), row=2, col=1)
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["macd"], mode="lines", line=dict(color="#F59E0B", width=1), name="MACD"), row=2, col=1)
@@ -727,7 +761,7 @@ with tab1:
         </div>
 
         <div class="analysis-card">
-            <div class="analysis-card-title">3. 몬테카를로 확률 시뮬레이션 및 트레이딩 관점</div>
+            <div class="analysis-card-title">3. 예측 모델 시뮬레이션 및 트레이딩 관점</div>
             <div class="analysis-card-content">{view_msg_html}</div>
         </div>
         """, unsafe_allow_html=True)
