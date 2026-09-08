@@ -1,5 +1,6 @@
 import streamlit as st
 import yfinance as yf
+from prophet import Prophet
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 from google import genai
@@ -320,7 +321,7 @@ JOURNAL_FILE = "trading_journal.csv"
 JOURNAL_COLUMNS = ["ID", "Date", "Ticker", "Action", "Price", "Reason"]
 
 # =========================================================
-# [5] 데이터 로딩 & 하이브리드 어드밴스드 예측 엔진
+# [5] 데이터 로딩 & 다중 예측 모델 엔진
 # =========================================================
 @st.cache_data(ttl=60, show_spinner=False)
 def load_price_data(t: str) -> pd.DataFrame:
@@ -362,7 +363,68 @@ def load_news(t: str) -> list:
     try: return yf.Ticker(t).news or []
     except: return []
 
-# 🌟 [최고급 모델] 하이브리드 트렌드 & 변동성 밴드 예측 엔진
+# 1. 몬테카를로 모델 (확률 분포 띠)
+@st.cache_data(ttl=3600, show_spinner=False)
+def run_monte_carlo_simulation(df_train: pd.DataFrame, years: int, num_simulations: int = 300) -> tuple:
+    if df_train.empty or "Close" not in df_train.columns or len(df_train) < 2:
+        dummy_dates = pd.bdate_range(start=date.today(), periods=years * 252)
+        return dummy_dates, np.ones(len(dummy_dates))*100, np.ones(len(dummy_dates))*100, np.ones(len(dummy_dates))*100
+
+    prices = df_train["Close"].values
+    log_returns = np.log(prices[1:] / prices[:-1])
+    mu = np.mean(log_returns) if len(log_returns) > 0 else 0.0
+    mu = np.clip(mu, -0.0003, 0.0003) 
+    sigma = np.std(log_returns) if len(log_returns) > 0 and np.std(log_returns) > 0 else 0.02
+    
+    num_days = years * 252
+    last_price = prices[-1]
+    last_date = df_train["Date"].iloc[-1]
+    
+    future_dates = pd.bdate_range(start=last_date, periods=num_days + 1)[1:]
+    
+    dt = 1
+    shock = np.random.normal(0, 1, size=(num_days, num_simulations))
+    drift = (mu - 0.5 * sigma**2) * dt
+    diffusion = sigma * np.sqrt(dt) * shock
+    
+    paths = np.zeros((num_days, num_simulations))
+    paths[0] = last_price * np.exp(drift + diffusion[0])
+    for t in range(1, num_days):
+        paths[t] = paths[t-1] * np.exp(drift + diffusion[t])
+        
+    p10 = np.percentile(paths, 10, axis=1)
+    p50 = np.percentile(paths, 50, axis=1)
+    p90 = np.percentile(paths, 90, axis=1)
+    
+    p10 = np.clip(p10, 0.01, None)
+    p50 = np.clip(p50, 0.01, None)
+    p90 = np.clip(p90, 0.01, None)
+    
+    return future_dates, p10, p50, p90
+
+# 2. Prophet AI 모델 (패턴 및 추세 예측 머신러닝)
+@st.cache_data(ttl=3600, show_spinner=False)
+def run_prophet_forecast(df_train: pd.DataFrame, years: int) -> pd.DataFrame:
+    df = df_train[["Date", "Close"]].copy().rename(columns={"Date": "ds", "Close": "y"})
+    
+    m = Prophet(
+        daily_seasonality=False,
+        weekly_seasonality=False,
+        yearly_seasonality=True,
+        changepoint_prior_scale=0.04
+    )
+    m.fit(df)
+    future = m.make_future_dataframe(periods=years * 365)
+    forecast = m.predict(future)
+    
+    # 마이너스 방지 방어선
+    forecast["yhat"] = np.clip(forecast["yhat"], 0.01, None)
+    forecast["yhat_lower"] = np.clip(forecast["yhat_lower"], 0.01, None)
+    forecast["yhat_upper"] = np.clip(forecast["yhat_upper"], 0.01, None)
+    
+    return forecast
+
+# 3. 하이브리드 트렌드 모델
 @st.cache_data(ttl=3600, show_spinner=False)
 def run_advanced_ai_forecast(df_train: pd.DataFrame, years: int) -> tuple:
     if df_train.empty or "Close" not in df_train.columns or len(df_train) < 2:
@@ -376,24 +438,17 @@ def run_advanced_ai_forecast(df_train: pd.DataFrame, years: int) -> tuple:
     num_days = years * 252
     future_dates = pd.bdate_range(start=last_date, periods=num_days + 1)[1:]
     
-    # 최근 추세(모멘텀) 계산 (과도한 널뛰기 방지를 위해 완만하게 보정)
     log_returns = np.log(prices[1:] / prices[:-1])
     daily_drift = np.clip(np.mean(log_returns), -0.0001, 0.0001)
     volatility = np.std(log_returns) if np.std(log_returns) > 0 else 0.02
     
-    # 시간 제곱근(Square root of time) 법칙을 활용한 정교한 신뢰구간 밴드 생성
     t_steps = np.arange(1, num_days + 1)
     central_path = last_price * np.exp(daily_drift * t_steps)
-    
-    # 변동성 폭 (상/하한 밴드)
     band_width = volatility * np.sqrt(t_steps) * last_price * 0.7
-    upper_path = central_path + band_width
-    lower_path = central_path - band_width
     
-    # 물리적 방어선 (주가가 절대 0원 이하로 내려가지 않도록 클리핑)
-    lower_path = np.clip(lower_path, 0.05, None)
+    upper_path = np.clip(central_path + band_width, 0.2, None)
+    lower_path = np.clip(central_path - band_width, 0.05, None)
     central_path = np.clip(central_path, 0.1, None)
-    upper_path = np.clip(upper_path, 0.2, None)
     
     return future_dates, lower_path, central_path, upper_path
 
@@ -457,10 +512,10 @@ def get_fallback_expert_analysis(t: str, delta_pct: float, rsi: float, mdd: floa
         f"- 전일 대비 {delta_pct:+.2f}% 변동 속에 RSI {rsi:.0f} 수치는 기술적 수급 균형점을 탐색 중입니다."
     )
     default_view = (
-        f"• <b>하이브리드 시클리컬 전망</b>\n"
-        f"- 최첨단 퀀트 예측 엔진 기반의 신뢰구간 내 변동성이 예상되며 분할 매크로 접근이 유효합니다.\n\n"
+        f"• <b>시클리컬 전망</b>\n"
+        f"- 선택된 예측 모델에 기반하여 향후 중장기 변동성이 예상되며 분할 매크로 접근이 유효합니다.\n\n"
         f"• <b>트레이딩 전략</b>\n"
-        f"- 볼린저 밴드 및 핵심 지지선 연동 리스크 관리를 동반한 분할 매매가 적합합니다."
+        f"- 기술적 밴드 및 핵심 지지선 연동 리스크 관리를 동반한 분할 매매가 적합합니다."
     )
     return default_reason, default_view
 
@@ -514,7 +569,7 @@ def get_chart_analysis_with_1hr_cache(t: str, cur_price: float, delta_pct: float
             f"- 볼린저 밴드, MACD 및 RSI({rsi:.0f}), MDD({mdd:.1f}%) 수급 메커니즘\n\n"
             f"[관점]\n"
             f"• 시클리컬 전망\n"
-            f"- 하이브리드 예측 모델 결과에 기반한 거시 구조 전망\n\n"
+            f"- AI/퀀트 예측 모델 결과에 기반한 거시 구조 전망\n\n"
             f"• 트레이딩 전략\n"
             f"- 지지/저항 및 타깃/손절 매매 전략\n\n"
             f"각 항목별로 깔끔하게 들여쓰기(- )와 줄바꿈을 사용하여 보기 쉽게 작성하고, 반드시 '[원인]'과 '[관점]' 태그를 구분해 주세요."
@@ -657,22 +712,44 @@ with tab1:
         ])
 
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("🎯 **최첨단 하이브리드 예측 모델 적용 완료** (안정적 변동성 밴드 및 트렌드 투영)")
+        # 💡 3가지 모델 선택 라디오 버튼 복원
+        forecast_model = st.radio(
+            "📊 **예측 분석 모델 선택**", 
+            [
+                "📊 몬테카를로 (확률/리스크 분석)", 
+                "🤖 Prophet AI (추세/패턴 예측)",
+                "🌟 하이브리드 트렌드 (안정형 밴드)"
+            ],
+            horizontal=True
+        )
 
         years = st.slider("예측 기간 (년)", 1, 5, 2, label_visibility="collapsed")
         
-        with st.spinner("하이브리드 예측 엔진 연산 중..."):
-            pred_dates, lower_b, central_p, upper_b = run_advanced_ai_forecast(data, years)
-
         fig_chart = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.75, 0.25], vertical_spacing=0.03)
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["Close"], mode="lines+markers", line=dict(color="#94A3B8", width=1.5), marker=dict(color="#94A3B8", size=3), name="실제 주가"), row=1, col=1)
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["bb_high"], mode="lines", line=dict(color="rgba(96, 165, 250, 0.3)", width=1), name="BB 상단"), row=1, col=1)
         fig_chart.add_trace(go.Scatter(x=data["Date"], y=data["bb_low"], mode="lines", line=dict(color="rgba(96, 165, 250, 0.3)", width=1), fill='tonexty', fillcolor="rgba(96, 165, 250, 0.05)", name="BB 하단"), row=1, col=1)
 
-        # 🌟 최고급 예측 밴드 시각화
-        fig_chart.add_trace(go.Scatter(x=pred_dates, y=upper_b, mode="lines", line=dict(color="rgba(245, 158, 11, 0.3)", width=1), name="예측 상한 밴드"), row=1, col=1)
-        fig_chart.add_trace(go.Scatter(x=pred_dates, y=lower_b, mode="lines", line=dict(color="rgba(245, 158, 11, 0.3)", width=1), fill='tonexty', fillcolor="rgba(245, 158, 11, 0.1)", name="예측 하한 밴드"), row=1, col=1)
-        fig_chart.add_trace(go.Scatter(x=pred_dates, y=central_p, mode="lines", line=dict(color="#F59E0B", width=2, dash="dash"), name="예측 중앙 추세선"), row=1, col=1)
+        # 💡 선택된 모델에 따른 시각화 분기
+        if forecast_model == "📊 몬테카를로 (확률/리스크 분석)":
+            with st.spinner("몬테카를로 확률 띠 시뮬레이션 중..."):
+                mc_dates, p10, p50, p90 = run_monte_carlo_simulation(data, years)
+                fig_chart.add_trace(go.Scatter(x=mc_dates, y=p90, mode="lines", line=dict(color="rgba(244, 63, 94, 0.2)", width=1), name="확률 상한 (90%)"), row=1, col=1)
+                fig_chart.add_trace(go.Scatter(x=mc_dates, y=p10, mode="lines", line=dict(color="rgba(244, 63, 94, 0.2)", width=1), fill='tonexty', fillcolor="rgba(244, 63, 94, 0.08)", name="확률 하한 (10%)"), row=1, col=1)
+                fig_chart.add_trace(go.Scatter(x=mc_dates, y=p50, mode="lines", line=dict(color="#F43F5E", width=2, dash="dash"), name="확률 중앙값 (P50)"), row=1, col=1)
+        elif forecast_model == "🤖 Prophet AI (추세/패턴 예측)":
+            with st.spinner("Prophet 머신러닝 패턴 학습 및 예측 중..."):
+                forecast = run_prophet_forecast(data, years)
+                future_forecast = forecast[forecast['ds'] > data['Date'].iloc[-1]]
+                fig_chart.add_trace(go.Scatter(x=future_forecast['ds'], y=future_forecast['yhat_upper'], mode='lines', line=dict(width=0), name='AI 상한'), row=1, col=1)
+                fig_chart.add_trace(go.Scatter(x=future_forecast['ds'], y=future_forecast['yhat_lower'], mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(245, 158, 11, 0.15)', name='AI 하한'), row=1, col=1)
+                fig_chart.add_trace(go.Scatter(x=future_forecast["ds"], y=future_forecast["yhat"], mode="lines", line=dict(color="#F59E0B", width=2), name="AI 예측 추세"), row=1, col=1)
+        else:
+            with st.spinner("하이브리드 트렌드 엔진 연산 중..."):
+                pred_dates, lower_b, central_p, upper_b = run_advanced_ai_forecast(data, years)
+                fig_chart.add_trace(go.Scatter(x=pred_dates, y=upper_b, mode="lines", line=dict(color="rgba(52, 211, 153, 0.3)", width=1), name="상한 밴드"), row=1, col=1)
+                fig_chart.add_trace(go.Scatter(x=pred_dates, y=lower_b, mode="lines", line=dict(color="rgba(52, 211, 153, 0.3)", width=1), fill='tonexty', fillcolor="rgba(52, 211, 153, 0.1)", name="하한 밴드"), row=1, col=1)
+                fig_chart.add_trace(go.Scatter(x=pred_dates, y=central_p, mode="lines", line=dict(color="#34D399", width=2, dash="dash"), name="중앙 트렌드"), row=1, col=1)
 
         colors = ['#F87171' if val >= 0 else '#60A5FA' for val in data["macd_diff"]]
         fig_chart.add_trace(go.Bar(x=data["Date"], y=data["macd_diff"], marker_color=colors, name="MACD Diff"), row=2, col=1)
