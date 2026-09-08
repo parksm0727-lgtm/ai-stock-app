@@ -367,6 +367,43 @@ def load_news(t: str) -> list:
     except Exception:
         return []
 
+# 0. 드리프트/변동성 공통 추정 로직 (몬테카를로 · 하이브리드 트렌드가 공유)
+def calc_ewma_daily_vol(log_returns: np.ndarray, lam: float = 0.94) -> float:
+    """
+    RiskMetrics 표준 EWMA(λ=0.94, 일별 데이터 기준)로 일간 변동성을 추정한다.
+    단순 np.std()는 2년 전 데이터와 어제 데이터에 동일한 가중치를 주기 때문에,
+    최근 변동성 국면(예: 실적 발표 이후 변동성 급등/급감)을 반영하지 못한다.
+    EWMA는 최근 관측치에 지수적으로 더 큰 가중치를 줘서 "현재" 변동성 레벨에
+    더 가깝게 추정한다.
+    """
+    if log_returns is None or len(log_returns) < 2:
+        return 0.02
+    var = float(log_returns[0] ** 2)
+    for r in log_returns[1:]:
+        var = lam * var + (1 - lam) * float(r) ** 2
+    return float(np.sqrt(var)) if var > 0 else 0.02
+
+def estimate_drift_vol(df_train: pd.DataFrame) -> tuple:
+    """
+    몬테카를로/하이브리드 트렌드 모델이 공통으로 쓰는 (일간 드리프트 mu, 일간 변동성 sigma)
+    추정치. 화면 상단 투명성 패널에도 동일한 값을 노출해 "모델이 이 종목에 대해
+    무엇을 가정하고 있는지" 사용자가 바로 확인할 수 있게 한다.
+
+    - mu: 2년 과거 평균 로그수익률을 그대로 쓰면 표본오차가 매우 크므로,
+      장기 시장 평균(연 8% ≈ 일 0.0003) 쪽으로 30% 축소(shrinkage)하고
+      현실적인 범위(연 약 -60%~+130%)로 clip한다.
+    - sigma: EWMA(λ=0.94)로 최근 변동성에 더 큰 가중치를 준다.
+    """
+    if df_train.empty or "Close" not in df_train.columns or len(df_train) < 2:
+        return 0.0003, 0.02
+    prices = df_train["Close"].values
+    log_returns = np.log(prices[1:] / prices[:-1])
+    raw_mu = np.mean(log_returns) if len(log_returns) > 0 else 0.0
+    market_mu = 0.0003
+    mu = np.clip(0.7 * raw_mu + 0.3 * market_mu, -0.0035, 0.0045)
+    sigma = calc_ewma_daily_vol(log_returns)
+    return float(mu), float(sigma)
+
 # 1. 몬테카를로 모델 (확률 분포 띠)
 @st.cache_data(ttl=3600, show_spinner=False)
 def run_monte_carlo_simulation(df_train: pd.DataFrame, years: int, num_simulations: int = 500) -> tuple:
@@ -375,20 +412,7 @@ def run_monte_carlo_simulation(df_train: pd.DataFrame, years: int, num_simulatio
         return dummy_dates, np.ones(len(dummy_dates))*100, np.ones(len(dummy_dates))*100, np.ones(len(dummy_dates))*100
 
     prices = df_train["Close"].values
-    log_returns = np.log(prices[1:] / prices[:-1])
-    raw_mu = np.mean(log_returns) if len(log_returns) > 0 else 0.0
-
-    # [수정] 과거 원본 코드는 mu를 -0.0003~0.0003(연 약 -7%~+8%)로 강하게
-    # clip해버려서, 실제 성장주/급등주(예: 워치리스트의 IONQ, OKLO, ASTS 등)의
-    # 고유한 추세가 완전히 사라지고 사실상 모든 종목이 "거의 평평한" 예측으로
-    # 수렴하는 문제가 있었다.
-    # -> 장기 시장 평균 수익률(연 8% ≈ 일 0.0003) 쪽으로 30%만 축소(shrinkage)해
-    #    단기 과최적화는 줄이되, 종목 고유의 추세는 보존한다.
-    #    또한 clip 범위도 연 -60%~+130% 수준으로 현실적으로 넓혔다.
-    market_mu = 0.0003
-    mu = 0.7 * raw_mu + 0.3 * market_mu
-    mu = np.clip(mu, -0.0035, 0.0045)
-    sigma = np.std(log_returns) if len(log_returns) > 0 and np.std(log_returns) > 0 else 0.02
+    mu, sigma = estimate_drift_vol(df_train)
 
     num_days = years * 252
     last_price = prices[-1]
@@ -464,18 +488,13 @@ def run_advanced_ai_forecast(df_train: pd.DataFrame, years: int) -> tuple:
     num_days = years * 252
     future_dates = pd.bdate_range(start=last_date, periods=num_days + 1)[1:]
 
-    log_returns = np.log(prices[1:] / prices[:-1])
-    raw_drift = np.mean(log_returns) if len(log_returns) > 0 else 0.0
-
     # [수정] 원본 코드는 daily_drift를 -0.0001~0.0001(연 약 -2.5%~+2.5%)로
     # 극단적으로 좁게 clip해서, "하이브리드 트렌드"라는 이름과 달리 사실상
     # 모든 종목이 거의 평평한 직선으로만 예측되는 문제가 있었다(몬테카를로와
     # 동일한 GBM 수식을 쓰면서 오히려 추세를 더 강하게 눌러버린 셈).
-    # 몬테카를로와 동일한 shrinkage 로직으로 통일해 일관성을 맞췄다.
-    market_mu = 0.0003
-    daily_drift = 0.7 * raw_drift + 0.3 * market_mu
-    daily_drift = np.clip(daily_drift, -0.0035, 0.0045)
-    volatility = np.std(log_returns) if np.std(log_returns) > 0 else 0.02
+    # 몬테카를로와 완전히 동일한 estimate_drift_vol()을 공유해 두 모델의
+    # 가정이 서로 어긋나지 않도록 통일했다(변동성도 EWMA로 통일).
+    daily_drift, volatility = estimate_drift_vol(df_train)
 
     t_steps = np.arange(1, num_days + 1)
     central_path = last_price * np.exp(daily_drift * t_steps)
@@ -486,6 +505,57 @@ def run_advanced_ai_forecast(df_train: pd.DataFrame, years: int) -> tuple:
     central_path = np.clip(central_path, 0.1, None)
 
     return future_dates, lower_path, central_path, upper_path
+
+# 4. 백테스트 (워크포워드 검증의 단순화 버전)
+@st.cache_data(ttl=3600, show_spinner=False)
+def run_model_backtest(df_train: pd.DataFrame, model_choice: str, holdout_days: int = 60) -> dict:
+    """
+    최근 holdout_days만큼을 "미래"인 척 떼어놓고, 그 이전 데이터로만 모델을
+    학습시켜 holdout 구간을 예측한 뒤 실제 값과 비교한다.
+
+    주의(중요한 한계): 몬테카를로/하이브리드 트렌드의 백테스트는 모델이 쓰는
+    드리프트(mu) 하나로 그린 "중심 경로" 기준 오차이며, 확률분포 폭(P10~P90)이
+    실제로 그 구간을 잘 커버했는지까지 검증하는 것은 아니다. 즉 "이 모델의
+    방향성/평균 가정이 최근에 얼마나 맞았는지"를 보여주는 참고 지표이지,
+    확률 구간 자체의 신뢰도를 보장하지는 않는다.
+    """
+    if df_train.empty or "Close" not in df_train.columns or len(df_train) < holdout_days + 100:
+        return {"available": False}
+
+    try:
+        train_part = df_train.iloc[:-holdout_days].reset_index(drop=True)
+        actual_part = df_train.iloc[-holdout_days:].reset_index(drop=True)
+        actual_prices = actual_part["Close"].values
+        last_train_price = train_part["Close"].values[-1]
+        n = len(actual_prices)
+
+        if model_choice.startswith("🤖"):
+            df_p = train_part[["Date", "Close"]].copy().rename(columns={"Date": "ds", "Close": "y"})
+            df_p["y"] = np.log(df_p["y"].clip(lower=0.01))
+            m = Prophet(daily_seasonality=False, weekly_seasonality=False,
+                        yearly_seasonality=True, changepoint_prior_scale=0.04)
+            m.fit(df_p)
+            future = pd.DataFrame({"ds": actual_part["Date"].values})
+            fc = m.predict(future)
+            pred_prices = np.exp(fc["yhat"].values)
+        else:
+            mu, _sigma = estimate_drift_vol(train_part)
+            t_steps = np.arange(1, n + 1)
+            pred_prices = last_train_price * np.exp(mu * t_steps)
+
+        pred_prices = np.clip(pred_prices, 0.01, None)
+        mape = float(np.mean(np.abs(actual_prices - pred_prices) / actual_prices) * 100)
+        actual_dir_up = bool(actual_prices[-1] >= last_train_price)
+        pred_dir_up = bool(pred_prices[-1] >= last_train_price)
+
+        return {
+            "available": True,
+            "holdout_days": holdout_days,
+            "mape": mape,
+            "direction_hit": actual_dir_up == pred_dir_up,
+        }
+    except Exception:
+        return {"available": False}
 
 def get_valid_models(client: genai.Client) -> list:
     valid_list = []
@@ -812,6 +882,44 @@ with tab1:
         fig_chart.update_xaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4", size=9))
         fig_chart.update_yaxes(showgrid=True, gridcolor="#1E293B", tickfont=dict(color="#ECEFF4", size=9))
         st.plotly_chart(fig_chart, use_container_width=True)
+
+        # --- 모델 투명성 패널: 이 모델이 이 종목에 대해 무엇을 가정하고 있고,
+        #     최근 데이터에서 그 가정이 얼마나 맞았는지를 보여준다. ---
+        mu_daily, sigma_daily = estimate_drift_vol(data)
+        mu_annual_pct = (np.exp(mu_daily * 252) - 1) * 100
+        sigma_annual_pct = sigma_daily * np.sqrt(252) * 100
+
+        with st.expander("📐 이 모델은 무엇을 가정하고 있나요? (가정 · 백테스트 신뢰도)"):
+            render_mini_grid([
+                {"label": "연 환산 기대수익률(μ)", "value": f"{mu_annual_pct:+.1f}%"},
+                {"label": "연 환산 변동성(σ, EWMA)", "value": f"{sigma_annual_pct:.1f}%"},
+                {"label": "변동성 추정", "value": "EWMA λ=0.94"},
+            ])
+            st.caption(
+                "μ는 2년 과거 평균수익률을 시장평균(연 8%) 쪽으로 30% 축소(shrinkage)한 값이고, "
+                "σ는 최근 데이터에 더 큰 가중치를 준 EWMA 추정치입니다. 몬테카를로·하이브리드 트렌드 "
+                "두 모델이 이 값을 공유합니다."
+            )
+
+            backtest = run_model_backtest(data, forecast_model, holdout_days=60)
+            if backtest.get("available"):
+                dir_text = "✅ 적중" if backtest["direction_hit"] else "❌ 불일치"
+                st.markdown(
+                    f'<div class="price-reason-box">'
+                    f'📊 <b>백테스트 (최근 {backtest["holdout_days"]}거래일)</b>: '
+                    f'선택한 모델을 그 이전 데이터만으로 학습시켜 최근 {backtest["holdout_days"]}일을 '
+                    f'예측했을 때 평균 오차(MAPE) <b>{backtest["mape"]:.1f}%</b>, 상승/하락 방향 {dir_text}'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+                if forecast_model != "🤖 Prophet AI (추세/패턴 예측)":
+                    st.caption(
+                        "⚠️ 몬테카를로/하이브리드 트렌드의 백테스트는 모델이 쓰는 드리프트(μ) 하나로 그린 "
+                        "중심 경로 기준 오차입니다. 확률 밴드(P10~P90) 자체가 실제 구간을 잘 커버했는지를 "
+                        "검증한 것은 아니므로, 방향성/평균 가정에 대한 참고 지표로만 활용하세요."
+                    )
+            else:
+                st.caption("백테스트에 필요한 데이터(최소 약 160거래일)가 부족해 신뢰도 지표를 계산할 수 없습니다.")
 
         active_key = get_active_gemini_key(api_key_input)
 
